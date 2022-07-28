@@ -1,0 +1,20 @@
+# read in data
+```{r}
+library(readxl)
+library(dplyr)
+library(here)
+here::here()
+
+col <- read_xlsx(here("data",
+                      "coleop.final.meta.xlsx")) %>%
+  # filter out taxa above family
+  filter(`final % sim` > 90) %>%
+  mutate(final_order = "", 
+         final_family = case_when(family_name!="NA" ~ family_name,
+                                  TRUE ~ "")) %>%
+  select(final_order, final_family, 1:4)
+
+write.csv(col, "data/coleop.family.lookup.csv", row.names = F)
+
+```
+

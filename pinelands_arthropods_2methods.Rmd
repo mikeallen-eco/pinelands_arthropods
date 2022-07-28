@@ -1,0 +1,398 @@
+# Arthropod metabarcoding (2 methods)
+Second field effort testing 2 methods with n = 20 samples each.
+
+# Load libraries. Read, clean and format data
+```{r}
+library(dplyr)
+library(metacoder)
+library(readxl)
+select <- dplyr::select
+
+# read in family name look up 
+    # will use to match each OTU with an NCBI family name
+    # created by looking up each entry in NCBI if it didn't 
+      # have a family name yet from bioinformatics work
+famlookup <- read_xlsx("data/arthropod.families_20220714.xlsx", 
+                       sheet = "arthropod.families") %>%
+  select(final_family, final_ID = 'final species_name') %>%
+  distinct()
+
+# read in family trait info (life mode)
+    # note: class and order added with taxize package using script:
+    # "scripts/adding_taxonomy_to_families.R"
+    # terrestrial/aquatic info from Horren et al. database & others
+lifemode <- read_xlsx("data/arthropod.families_20220728.xlsx", 
+                      sheet = "arthropod.families.lifemode") %>%
+  select(-person)
+
+# read in family trait info (diet/feeding)
+    # note: class and order added with taxize package using script:
+    # "scripts/adding_taxonomy_to_families.R"
+    # diet/feeding info from Horren et al. database & others
+diet <- read_xlsx("data/arthropod.families_20220728.xlsx", 
+                      sheet = "arthropod.families.diet") %>%
+  select(-person) %>%
+  # create a condensed diet/feeding classification
+  mutate(diet.cat = case_when(final_diet == "mixed" ~ 
+                                "multiple categories",
+                              final_diet %in% 
+                                c("zoophagous", "phytophagous") ~
+                                paste(final_diet, feed_mode, 
+                                      sep = "-"),
+                              final_diet %in% c("saprophagous", 
+                                                "detritophagous") ~ 
+                                "detritiphagous/scavenger",
+                              TRUE ~ final_diet),
+         diet.cat = case_when(notes == ".9 det/sap/cop" ~ 
+                                "detritiphagous/scavenger",
+                              family %in% c("Calliphoridae",
+                                                  "Polleniidae",
+                                                  "Rhiniidae") ~
+                                "detritiphagous/scavenger",
+                              diet.cat == "zoophagous-necro" ~
+                                "detritiphagous/scavenger",
+                           diet.cat %in% c("phytophagous-mixed",
+                                        "phytophagous-not specified") ~
+                             "phytophagous-multiple/other",
+                           diet.cat == "phytophagous-flower" ~
+                             "phytophagous-multiple/other",
+                           diet.cat %in% c("phytophagous-miners",
+                                           "phytophagous-gall") ~
+                             "phytophagous-galls/miners",
+                           diet.cat %in% c("zoophagous-parasite",
+                                           "zoophagous-parasitoid",
+                                           "zoophagous-micropredator") ~
+                             "zoophagous-parasite/parasitoid",
+                              TRUE ~ diet.cat))
+
+table(diet$diet.cat)
+
+
+
+# read in OTU data for coleop primer set and merge with family name
+coleop_all <- read_xlsx("data/coleop.9.final.meta.xlsx", 
+                    sheet = "Sheet1") %>%
+  rename(final_ID = 'final species_name') %>%
+  left_join(famlookup, by = "final_ID")
+
+coleop <- coleop_all %>%
+  filter(is.na(final_family)==F,
+         final_family != "NA")
+
+# read in OTU data for Zeale primer set
+zeale <- read_xlsx("data/zeale.fam.final.meta.xlsx", 
+                   sheet ="Sheet1")
+
+
+
+d_otus <- read.csv("data/ITS_CO1datacombined.csv") %>%
+  filter(fam != "",
+         fam != "Chaoboridae", # fully aquatic
+         fam != "Coenagrionidae") %>% # fully aquatic
+  mutate(lineage = paste0("r__Arthro.;c__", class, ";o__", order, ";f__", fam)) %>%
+  select(otu_id, lineage, Soil1:Water2)
+
+d_samples <- data.frame(sample_id = c("Soil1", "Soil2", "Soil3", "Soil4", "Soil5",
+                                      "Roller2", "Roller3", "Roller5",
+                                      "Spray3", "Spray4", "Spray5",
+                                      "Water1", "Water2"),
+                        Method = c(rep("Soil", 5), rep("Roller", 3), 
+                                   rep("Spray", 3), rep("Water", 2)))
+
+dl <- read.csv("data/ITS_CO1datacombined.csv") %>%
+  select(fam, hab, feed, size_cat, Soil1:Water2) %>%
+    filter(fam != "",
+         fam != "Chaoboridae", # fully aquatic
+         fam != "Coenagrionidae") %>% # fully aquatic
+  pivot_longer(cols = Soil1:Water2) %>%
+  mutate(type = substr(name, 1,3)) %>%
+  group_by(fam, hab, feed, size_cat, type) %>%
+  summarize(total = sum(value)) %>%
+  ungroup() %>%
+  arrange(type, fam) %>%
+  filter(is.na(fam) != T) %>%
+  mutate(Method = case_when(type == "Soi" ~ "Soil",
+                            type == "Spr" ~ "Spray",
+                            type == "Rol" ~ "Roller",
+                            type == "Wat" ~ "Water"),
+         Guild = case_when(feed == "Omin" ~ "Omnivore",
+                           feed == "Para" ~ "Parasitoid",
+                           feed == "Pred/phyto" ~ "Mixed",
+                           feed == "Predator, Phyto" ~ "Mixed",
+                           feed == "Variety" ~ "Mixed",
+                           feed == "Phyto" ~ "Phytoph.",
+                           feed == "Predator" ~ "Predator"),
+         Habitat = case_when(hab == "T" ~ "Terrestrial",
+                           hab == "A" ~ "Aquatic",
+                           hab == "A/T" ~ "Mixed"),
+# 0-5=tiny, 5-10=small; 10-20 medium, 20+ large
+         Body_Size = case_when(size_cat == "Large" ~ ">20 mm",
+                               size_cat == "Medium" ~ "10-20 mm",
+                               size_cat == "Small" ~ "5-10 mm",
+                               size_cat == "Tiny" ~ "<5 mm",
+                               size_cat == "" ~ "Unknown"),
+         Body_Size_order = case_when(Body_Size == "<5 mm" ~ 5,
+                           Body_Size == "5-10 mm" ~ 4,
+                           Body_Size == "10-20 mm" ~ 3,
+                           Body_Size == ">20 mm" ~ 2,
+                           Body_Size == "Unknown" ~ 1),
+         Habitat_order = case_when(Habitat == "Terrestrial" ~ 2,
+                           Habitat == "Aquatic" ~ 3,
+                           Habitat == "Mixed" ~ 1),
+         Guild_order = case_when(Guild == "Predator" ~ 5,
+                           Guild == "Phytoph." ~ 4,
+                           Guild == "Omnivore" ~ 3,
+                           Guild == "Parasitoid" ~ 2,
+                           Guild == "Mixed" ~ 1))
+```
+
+# Feeding Guild
+```{r}
+(feed <- dl %>%
+    mutate(Guild = fct_reorder(Guild, desc(Guild_order))) %>%
+ggplot(aes(x = Method, y = total, fill = Guild)) +
+  theme_bw() +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  geom_bar(stat="identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab ("Proportion of OTUs") + 
+  xlab("") +
+  ggtitle("Feeding Guild") +
+  theme(axis.text.x = element_text(size = 15)))
+# ggsave("figures/feeding_guild_no_aquatic.jpg", width = 6, height = 6, dpi = 400)
+```
+# Habitat
+```{r}
+(hab <- dl %>%
+  mutate(Habitat = fct_reorder(Habitat, desc(Habitat_order))) %>%
+ggplot(aes(x = Method, y = total, fill = Habitat)) +
+  theme_bw() +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  geom_bar(stat="identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab ("Proportion of OTUs") + 
+  xlab("") +
+  ggtitle("Habitat") +
+  theme(axis.text.x = element_text(size = 15)))
+# ggsave("figures/habitat_no_aquatic.jpg", width = 6, height = 6, dpi = 400)
+```
+# Body Size
+```{r}
+(size <- dl %>%
+  mutate(Body_Size = fct_reorder(Body_Size, desc(Body_Size_order))) %>%
+  ggplot(aes(x = Method, y = total, fill = Body_Size)) +
+  theme_bw() +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  geom_bar(stat="identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab ("Proportion of OTUs") + 
+  labs(fill = "Body Size") +
+  xlab("") +
+  ggtitle("Body Size") +
+  theme(axis.text.x = element_text(size = 15)))
+# ggsave("figures/body_size_no_aquatic.jpg", width = 6, height = 6, dpi = 400)
+
+require(gridExtra)
+grid.arrange(feed, size, hab, ncol=3)
+
+# ggsave("figures/whos_there_no_aquatic.jpg", arrangeGrob(feed, size, hab), width= 7, height = 7, dpi = 500)
+```
+
+```{r}
+library(taxa)
+obj <- parse_tax_data(d_otus,
+                      class_cols = "lineage", 
+                      class_sep = ";", 
+                      class_regex = "^(.+)__(.+)$", # Regex 
+                      class_key = c(tax_rank = "info", # key describing each regex group
+                                    tax_name = "taxon_name"))
+
+# convert to proportions
+# obj$data$tax_data <- calc_obs_props(obj, "tax_data")
+
+#Getting per-taxon information
+obj$data$tax_abund <- calc_taxon_abund(obj, "tax_data",
+                                       cols = d_samples$sample_id,
+                                       groups = d_samples$Method)
+obj$data$tax_abund$Soil_per <- obj$data$tax_abund$Soil/5
+obj$data$tax_abund$Roller_per <- obj$data$tax_abund$Roller/3
+obj$data$tax_abund$Spray_per <- obj$data$tax_abund$Spray/3
+obj$data$tax_abund$Water_per <- obj$data$tax_abund$Water/2
+
+
+#Getting per-taxon information for 'number of samples'
+obj$data$tax_abund1 <- calc_taxon_abund(obj, "tax_data",
+                                       cols = d_samples$sample_id)
+
+# calculate the number of samples that have reads for each taxon
+obj$data$tax_occ <- calc_n_samples(obj, "tax_abund1", groups = d_samples$Method, cols = d_samples$sample_id)
+
+# calculate the number of methods that detected each taxon
+obj$data$tax_occ$num_methods <- (obj$data$tax_occ$Soil>0) +
+  (obj$data$tax_occ$Roller>0) +
+  (obj$data$tax_occ$Spray>0) +
+  (obj$data$tax_occ$Water>0)
+
+# calculate mean number of taxa detected across all methods
+obj$data$tax_abund$All_per <- (obj$data$tax_abund$Soil_per +
+  obj$data$tax_abund$Roller_per + 
+  obj$data$tax_abund$Spray_per +
+  obj$data$tax_abund$Water_per)/4
+
+
+```
+# Make heat trees
+```{r}
+# Soil
+set.seed(1) # This makes the plot appear the same each time it is run 
+(soil <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Soil_per,
+          node_color = obj$data$tax_occ$Soil, 
+          node_color_digits = 2,
+          node_color_trans = "linear",
+          node_color_interval = c(0,5),
+          node_size_axis_label = "Mean OTUs / sample",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") +
+    theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Soil", size = 9)
+  )
+ # ggsave("figures/Soil_tree_abund2_margin.jpg", 
+        # width = 7, height = 7, dpi = 400)
+
+# Roller
+set.seed(1) # This makes the plot appear the same each time it is run 
+(roller <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Roller_per,
+          node_color = obj$data$tax_occ$Roller,
+          node_color_digits = 2,
+          node_color_trans = "linear",
+          node_color_interval = c(0,3),
+          node_size_axis_label = "Mean OTUs / sample",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") %>%
+  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Roller", size = 9)
+  )
+# ggsave("figures/Roller_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
+
+# Spray
+set.seed(1) # This makes the plot appear the same each time it is run 
+(spray <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Spray_per,
+          node_color = obj$data$tax_occ$Spray,
+          node_color_digits = 1,
+          node_color_trans = "linear",
+          node_color_interval = c(0,3),
+          node_size_axis_label = "Mean OTUs / sample",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") %>%
+  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Spray", size = 9)
+  )
+# ggsave("figures/Spray_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
+
+# Water
+set.seed(1) # This makes the plot appear the same each time it is run 
+(water <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Water_per,
+          node_color = obj$data$tax_occ$Water,
+          node_color_digits = 1,
+          node_color_trans = "linear",
+          node_color_interval = c(0,2),
+          node_size_axis_label = "Mean OTUs / sample",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") %>%
+  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Water", size = 9) 
+)
+# ggsave("figures/Water_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
+
+# 4-panel figure
+g <- gridExtra::grid.arrange(roller, spray, soil, water)
+
+ggsave("figures/heat_tree_collage_grid5.svg", g, 
+       height = 9, width = 9, dpi = 400)
+```
+# Make heat tree showing number of methods that detected each taxa
+```{r}
+set.seed(1) # This makes the plot appear the same each time it is run 
+(methods <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$All_per,
+          node_color = obj$data$tax_occ$num_methods, 
+          node_size_axis_label = "Mean OTUs / sample",
+          node_color_axis_label = "No. methods with reads",
+          node_color_range = c("gray", "darkgoldenrod1", "steelblue"),
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford")) # The layout algorithm 
+# ggsave("figures/methods_tree_abund2.svg", width = 7, height = 7, dpi = 400)
+```
+# Species accumulation curves
+used code from here: https://rpubs.com/Roeland-KINDT/694021
+and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
+```{r}
+library(BiodiversityR) # also loads vegan
+library(ggplot2)
+# library(ggsci)
+# library(readxl)
+
+spray_roll_mat <- as.matrix(select(d_otus, starts_with("Roll"), 
+                                starts_with("Spray"))) %>%
+  t()
+spray_roll_mat[spray_roll_mat>0] <- 1 
+
+soil_mat <- as.matrix(select(d_otus, starts_with("Soil"))) %>%
+  t()
+soil_mat[soil_mat>0] <- 1 
+
+
+accum.spray_roll <- accumcomp(spray_roll_mat, 
+                     y=data.frame(method = rep("spray_roll", 6)),
+                     factor='method', 
+  method='exact', conditioned=FALSE, plotit=FALSE)
+accum.spray_roll
+
+accum.soil <- accumcomp(soil_mat, 
+                     y=data.frame(method = rep("soil", 5)),
+                     factor='method', 
+  method='exact', conditioned=FALSE, plotit=FALSE)
+accum.soil
+
+plot.data.spray_roll <- data.frame(samples = c(accum.spray_roll[,,1]), 
+           s = c(accum.spray_roll[,,2]), 
+           sd = c(accum.spray_roll[,,3]),
+           method = "spray_roll")
+
+plot.data.soil <- data.frame(samples = c(accum.soil[,,1]), 
+           s = c(accum.soil[,,2]), 
+           sd = c(accum.soil[,,3]),
+           method = "soil")
+
+plot.data <- plot.data.spray_roll %>%
+  bind_rows(plot.data.soil)
+
+ggplot(plot.data) +
+  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+                  ymax = s+2*sd, fill = method),
+              alpha = 0.5) +  
+  geom_line(aes(x = samples, y = s, group = method), size = 1) +
+  scale_fill_manual(values = c("darkgreen", "steelblue")) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "No. samples", y = "No. families")
+
+
+# ggsave("species_accumulation_curve_spray_roll_soil.png", 
+#        dpi = 600, width = 6, height = 4)
+```
+
+
