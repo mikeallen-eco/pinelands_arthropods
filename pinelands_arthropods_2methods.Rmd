@@ -6,13 +6,14 @@ Second field effort testing 2 methods with n = 20 samples each.
 library(dplyr)
 library(metacoder)
 library(readxl)
+library(ggplot2)
 select <- dplyr::select
 
 # read in family name look up 
     # will use to match each OTU with an NCBI family name
     # created by looking up each entry in NCBI if it didn't 
       # have a family name yet from bioinformatics work
-famlookup <- read_xlsx("data/arthropod.families_20220714.xlsx", 
+famlookup <- read_xlsx("data/arthropod.families_20220729.xlsx", 
                        sheet = "arthropod.families") %>%
   select(final_family, final_ID = 'final species_name') %>%
   distinct()
@@ -21,7 +22,7 @@ famlookup <- read_xlsx("data/arthropod.families_20220714.xlsx",
     # note: class and order added with taxize package using script:
     # "scripts/adding_taxonomy_to_families.R"
     # terrestrial/aquatic info from Horren et al. database & others
-lifemode <- read_xlsx("data/arthropod.families_20220728.xlsx", 
+lifemode <- read_xlsx("data/arthropod.families_20220729.xlsx", 
                       sheet = "arthropod.families.lifemode") %>%
   select(-person)
 
@@ -29,7 +30,7 @@ lifemode <- read_xlsx("data/arthropod.families_20220728.xlsx",
     # note: class and order added with taxize package using script:
     # "scripts/adding_taxonomy_to_families.R"
     # diet/feeding info from Horren et al. database & others
-diet <- read_xlsx("data/arthropod.families_20220728.xlsx", 
+diet <- read_xlsx("data/arthropod.families_20220729.xlsx", 
                       sheet = "arthropod.families.diet") %>%
   select(-person) %>%
   # create a condensed diet/feeding classification
@@ -41,16 +42,16 @@ diet <- read_xlsx("data/arthropod.families_20220728.xlsx",
                                       sep = "-"),
                               final_diet %in% c("saprophagous", 
                                                 "detritophagous") ~ 
-                                "detritiphagous/scavenger",
+                                "detritophagous/scavenger",
                               TRUE ~ final_diet),
          diet.cat = case_when(notes == ".9 det/sap/cop" ~ 
-                                "detritiphagous/scavenger",
+                                "detritophagous/scavenger",
                               family %in% c("Calliphoridae",
                                                   "Polleniidae",
                                                   "Rhiniidae") ~
-                                "detritiphagous/scavenger",
+                                "detritophagous/scavenger",
                               diet.cat == "zoophagous-necro" ~
-                                "detritiphagous/scavenger",
+                                "detritophagous/scavenger",
                            diet.cat %in% c("phytophagous-mixed",
                                         "phytophagous-not specified") ~
                              "phytophagous-multiple/other",
@@ -66,36 +67,203 @@ diet <- read_xlsx("data/arthropod.families_20220728.xlsx",
                               TRUE ~ diet.cat))
 
 table(diet$diet.cat)
+# final category notes: 
+# detritophagous/scavenger = detrit., copro., sapro., and zoo.-necro.
 
+# read in family trait info (body size)
+    # note: class and order added with taxize package using script:
+    # "scripts/adding_taxonomy_to_families.R"
+    # diet/feeding info from Horren et al. database & others
+size <- read_xlsx("data/arthropod.families_20220729.xlsx", 
+                      sheet = "arthropod.families.size") %>%
+  select(-person) %>%
+  select(family:final_source)
 
-
-# read in OTU data for coleop primer set and merge with family name
-coleop_all <- read_xlsx("data/coleop.9.final.meta.xlsx", 
+# read in OTU data for coleop primer set and add higher taxonomy
+coleop_all_step1 <- read_xlsx("data/coleop.9.final.meta.xlsx", 
                     sheet = "Sheet1") %>%
   rename(final_ID = 'final species_name') %>%
-  left_join(famlookup, by = "final_ID")
+  left_join(famlookup, by = "final_ID") %>%
+  left_join(select(size, class, order, final_family = family), 
+            by = "final_family") %>%
+  select(class, order, family = final_family, 
+         final_ID, final_rank = 'final rank', starts_with("sample"))
 
-coleop <- coleop_all %>%
-  filter(is.na(final_family)==F,
-         final_family != "NA")
+# check for missed family-level arthropods in coleop dataset
+    # view this object and scan final_ID's with family == NA
+coleop_check <- coleop_all_step1 %>% 
+  filter(is.na(order)==T | order == "NA") %>%
+  filter(family == "NA" | is.na(family)==T)
+rm(coleop_check)
+
+# used this code to get higher taxonomy for non-arthropods
+nonarth_step1 <- coleop_all_step1 %>%
+  filter(is.na(order)==T | order == "NA") %>%
+  filter(family != "NA" & is.na(family)==F)
+ 
+# orders <- tax_name(sci = nonarth_step1$family, 
+#                    get = c("order", "class"), db = "ncbi")
+# dput(distinct(orders))
+
+# the resulting lookup table for higher taxonomy of other orders
+coleop_nonarth_lookup <-
+  data.frame(
+      family = c(
+        "Truncatellidae",
+        "Phascolosomatidae",
+        "Plethodontidae",
+        "Agriolimacidae",
+        "Vespertilionidae",
+        "Helicidae"
+      ),
+      order = c(
+        "Littorinimorpha",
+        "Phascolosomatiformes",
+        "Caudata",
+        "Stylommatophora",
+        "Chiroptera",
+        "Stylommatophora"
+      ),
+      class = c(
+        "Gastropoda",
+        "Phascolosomatida",
+        "Amphibia",
+        "Gastropoda",
+        "Mammalia",
+        "Gastropoda"
+      ),
+      phyllum = c(
+        "Mollusca",
+        "Sipuncula",
+        "Chordata",
+        "Mollusca",
+        "Chordata",
+        "Mollusca")
+    )
+  
+# add higher taxonomy to non-arthropods for coleop_all
+nonarth <- nonarth_step1 %>%
+  select(-class, -order, -final_rank) %>%
+  left_join(coleop_nonarth_lookup, by = "family")
+
+# add in higher taxonomy to coleop_all
+coleop <- coleop_all_step1 %>%
+  select(-final_rank) %>%
+  # filter out all non-arthropods & anything not identified to family
+  filter(is.na(order)==F & order != "NA") %>%
+  filter(family != "NA" & is.na(family)==F) %>%
+  # add column for phyllum
+  mutate(phyllum = "Arthropoda") %>%
+  bind_rows(nonarth) %>%
+  mutate(primer = "coleop") %>%
+  select(primer, phyllum, class, order, family, 
+         final_ID, starts_with("sample")) %>%
+  arrange(primer, phyllum, class, order, family, final_ID)
+
+# ULTIMATELY WILL ADD PHYLLUM/CLASS/ORDER TAXONOMY TO FAMLOOKUP ABOVE
+# THAT WILL CONDENSE THE CODE CONSIDERABLY
 
 # read in OTU data for Zeale primer set
-zeale <- read_xlsx("data/zeale.fam.final.meta.xlsx", 
-                   sheet ="Sheet1")
+zeale_step1 <- read_xlsx("data/zeale.fam.final.meta.xlsx", 
+                   sheet ="Sheet1") %>%
+  rename(final_ID = Identification) %>%
+  left_join(famlookup, by = "final_ID") %>%
+  left_join(select(size, class, order, final_family = family), 
+            by = "final_family") %>%
+  select(class, order, family = final_family, 
+         final_ID, final_rank = rank, starts_with("sample"))
 
+# check for missed arthropods in zeale dataset
+    # view this object and scan final_ID's with family == NA
+zeale_check <- zeale_step1 %>% 
+  filter(is.na(order)==T | order == "NA") %>%
+  filter(family == "NA" | is.na(family)==T)
+rm(zeale_check)
 
+# used this code to get higher taxonomy for non-arthropods
+nonarth_zeale_step1 <- zeale_step1 %>%
+  filter(is.na(order)==T | order == "NA") %>%
+  filter(family != "NA" & is.na(family)==F)
 
-d_otus <- read.csv("data/ITS_CO1datacombined.csv") %>%
-  filter(fam != "",
-         fam != "Chaoboridae", # fully aquatic
-         fam != "Coenagrionidae") %>% # fully aquatic
-  mutate(lineage = paste0("r__Arthro.;c__", class, ";o__", order, ";f__", fam)) %>%
-  select(otu_id, lineage, Soil1:Water2)
+# there are no non-arthropods in the Zeale dataset!
+ 
+# finalize zeale
+zeale <- zeale_step1 %>%
+  select(-final_rank) %>%
+  # filter out anything not identified to family
+  filter(is.na(order)==F & order != "NA") %>%
+  filter(family != "NA" & is.na(family)==F) %>%
+  # add column for phyllum
+  mutate(phyllum = "Arthropoda",
+         primer = "zeale") %>%
+  select(primer, phyllum, class, order, family, 
+         final_ID, starts_with("sample")) %>%
+  arrange(primer, phyllum, class, order, family, final_ID)
 
-d_samples <- data.frame(sample_id = c("Soil1", "Soil2", "Soil3", "Soil4", "Soil5",
-                                      "Roller2", "Roller3", "Roller5",
-                                      "Spray3", "Spray4", "Spray5",
-                                      "Water1", "Water2"),
+# combine data sets
+data_full <- zeale %>%
+  bind_rows(coleop)
+
+# reads data just for arthropods
+art <- data_full %>%
+  filter(phyllum == "Arthropoda") %>%
+  group_by(primer, family) %>%
+  mutate(otu_id = paste0(family,"_", primer, "_", 1:length(primer))) %>%
+  ungroup() %>%
+  mutate(lineage = paste0("r__Arthro.;c__", class, ";o__", order, ";f__", family))
+
+# otu count by family for arthropods (both primers separate) # aka d_otus
+n_otus <- art %>%
+  select(primer, lineage, starts_with("sample")) %>%
+  mutate(across(.cols = starts_with("sample"), 
+                .fns = function(x) ifelse(x > 0, 1, 0))) %>%
+  group_by(primer, lineage) %>%
+  summarise(across(starts_with("sample"), sum),
+            .groups = "drop") %>%
+  mutate('sample:1DS' = 0,
+         'sample:9DS' = 0,
+         'sample:3DS' = 0) %>%
+  group_by(lineage) %>%
+  # max number of OTUs detected by either primer set
+  summarise(across(starts_with("sample"), max))
+
+# rename columns
+new_col_names <- n_otus %>% 
+  select(starts_with("sample")) %>%
+  colnames() %>%
+  substr(., 1, 11) %>%
+  gsub(., pattern = ":", replacement = "") %>%
+  gsub(., pattern = "B", replacement = "") %>%
+  gsub(., pattern = "Z", replacement = "")
+
+colnames(n_otus) <- c("lineage", new_col_names)
+
+# family presence/absence for arthropods (both primers combined)
+pa_fam <- n_otus %>%
+  mutate(across(starts_with("sample"),
+                .fns = function(x) ifelse(x > 0,1,0)))
+
+# separate family presenc/absence into spray & roller matrices
+pa_fam_s <- pa_fam %>%
+  select(contains("CS"), sample1DS, sample2DS, 
+         sample3DS, contains("DS")[2:6],
+         sample9DS, sample10DS) %>%
+  as.matrix()
+
+pa_fam_r <- pa_fam %>%
+  select(contains("CR"), contains("DR")) %>%
+  as.matrix()
+
+# make a data frame listing which species each method found
+pasum <- data.frame(
+  lineage = pa_fam$lineage,
+  spray.pa = apply(pa_fam_s, 1, mean),
+  roll.pa = apply(pa_fam_r, 1, mean))
+
+pasum %>%
+  ggplot2::gg
+
+d_samples <- data.frame(sample_id = colnames(p_fam),
                         Method = c(rep("Soil", 5), rep("Roller", 3), 
                                    rep("Spray", 3), rep("Water", 2)))
 
