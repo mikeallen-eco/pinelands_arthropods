@@ -382,13 +382,6 @@ ggsave("figures/PlotB_family_abundance_distribution_roller_spray.jpg",
 ```
 # Format data for the heat trees
 ```{r}
-# obj <- parse_tax_data(pasum,
-#                       class_cols = "lineage", 
-#                       class_sep = ";", 
-#                       class_regex = "^(.+)__(.+)$", # Regex 
-#                       class_key = c(tax_rank = "info", 
-#                                     # key describing each regex group
-#                                     tax_name = "taxon_name"))
 
 obj <- parse_tax_data(n_otus_max,
                       class_cols = "lineage", 
@@ -463,7 +456,7 @@ set.seed(4) # This makes the plot appear the same each time it is run
           node_color_trans = "linear",
           node_color_interval = c(-1,1),
           node_size_interval = c(0,100),
-          node_size_axis_label = "Prop. sites",
+          node_size_axis_label = "% of sites",
           node_color_axis_label = "",
           node_color_range = c("steelblue", "#CBC3E3", "firebrick"),
           layout = "davidson-harel", # The primary layout algorithm
@@ -483,7 +476,6 @@ set.seed(4) # This makes the plot appear the same each time it is run
 dif_tab <- obj$data$diff_table2
 
 set.seed(4)
-dev.new(10,10)
 heat_tree(obj, 
           node_label = taxon_names,
           node_size = obj$data$tax_occ$p_any,
@@ -496,12 +488,10 @@ heat_tree(obj,
           node_color_axis_label = "Log 2 ratio of median proportions",
           layout = "davidson-harel", # The primary layout algorithm
           initial_layout = "reingold-tilford") 
+
+ggsave("figures/PlotD_Spray_Roll_difference.jpg",
+   width = 7, height = 7, dpi = 400)
 ```
-
-
-
-
-
 # Species accumulation curves
 used code from here: https://rpubs.com/Roeland-KINDT/694021
 and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
@@ -557,9 +547,145 @@ ggplot(plot.data) +
   labs(x = "No. samples", y = "No. families", fill = "")
 
 
-ggsave("figures/PlotD_species_accumulation_curve_spray_roll.png",
+ggsave("figures/PlotE_species_accumulation_curve_spray_roll.jpg",
        dpi = 600, width = 6, height = 4)
 ```
+# Spray vs Roller, conifer vs. deciduous NMDS
+```{r}
+library(vegan)
+library(BiodiversityR)
+library(MASS)
+
+mds_data <- rbind(t(pa_fam_r),
+                  t(pa_fam_s))
+
+# remove blank rows (no blanks)
+mds_data_nb <- mds_data[-which(rownames(mds_data) %in% 
+                                     c("sample1DS",
+                                       "sample3DS",
+                                       "sample9DS")),]
+
+env.data <- data.frame(tree = str_sub(rownames(mds_data_nb), 
+                                      -2, -2),
+                       method = str_sub(rownames(mds_data_nb), 
+                                        -1, -1)) %>%
+  mutate(tree = case_when(tree == "C" ~ "Coniferous",
+                          tree == "D" ~ "Deciduous"),
+         method = case_when(method == "R" ~ "Roller",
+                            method == "S" ~ "Spray"))
+
+distances <- vegdist(mds_data_nb, method = "jaccard")
+arthMDS <- isoMDS(distances, maxit = 300)
+
+# plot results
+arthMDS.df <- arthMDS$points %>%
+  as.data.frame() %>%
+  bind_cols(env.data)
+
+arthMDS.df %>%
+  ggplot() +
+  geom_point(aes(x = V1, y = V2, color = method, shape = tree),
+  size = 5) +
+  coord_fixed(ratio = 1)
+
+
+# package vegan NMDS
+arthNMDS = metaMDS(mds_data_nb,
+                     k=2, distance = 'jaccard', trymax = 1000) 
+
+plot1 <- ordiplot(arthNMDS, choices = c(1, 2))
+
+sites.long1 <-
+  BiodiversityR::sites.long(plot1, env.data = env.data) %>%
+  mutate(axis1 = as.numeric(axis1),
+         axis2 = as.numeric(axis2))
+head(sites.long1)
+str(sites.long1)
+
+ggplot(sites.long1) +
+  geom_vline(xintercept = c(0),
+             color = "grey70",
+             linetype = 2) +
+  geom_hline(yintercept = c(0),
+             color = "grey70",
+             linetype = 2) +     
+  scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+  scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_color_manual(values = wes_palette("Cavalcanti1")) +
+  geom_point(aes(
+    x = axis1,
+    y = axis2,
+    color = method,
+    shape = tree
+  ),
+  size = 5,
+  alpha = 0.85) +
+  coord_fixed(ratio = 1) +
+  labs(y = "NMDS2", x = "NMDS1",
+       color = "Method", shape = "Tree type") +
+  theme_bw() +
+  theme(text = element_text(size = 14))
+
+ggsave("figures/PlotF_NMDS_by_method_and_tree_type.jpg",
+       dpi = 600, width = 6, height = 6)
+
+
+# Test for differences among Method and Tree type
+# PERMANOVA
+perm_arth <- adonis(mds_data_nb ~ method + tree, data = env.data, 
+       permutations = 999, method = "jaccard",
+       strata = NULL, contr.unordered = "contr.sum",
+       contr.ordered = "contr.poly")
+
+perm_arth
+
+# ANOSIM
+method_anosim <- anosim(mds_data_nb, grouping = env.data$method)
+summary(method_anosim) # p 0.001
+
+tree_anosim <- anosim(mds_data_nb, grouping = env.data$tree)
+summary(tree_anosim) # p ~ 0.1
+
+
+
+```
+
+
+
+
+
+# rarefy & diversity code from metabarcoding workshop
+```{r}
+# t_fishfarm is a sample x MOTU matrix filled with reads
+min_depth_fishfarm <- min(rowSums(t_fishfarm))
+
+# rarefaction curves
+fishfarm.curve <-
+  rarecurve(
+    t_fishfarm_curve, # same as t_fishfarm
+    step = 20,
+    sample = min_depth_fishfarm,
+    col = nrow(t_fishfarm), # number of samples
+    label = T
+  )
+
+fishfarm_rare <- rrarefy(t_fishfarm, min_depth_fishfarm)
+
+# Alpha diversity - Shannon index
+# W/o rarefying
+H_fish_norar <- diversity(t_fishfarm, index = "shannon", MARGIN = 1, base = exp(1))
+
+# w/ rarefying
+H_fish_rar <- diversity(fishfarm_rare, index = "shannon", MARGIN = 1, base = exp(1))
+
+
+
+
+```
+
+
+
+
 
 
 # Feeding guild
