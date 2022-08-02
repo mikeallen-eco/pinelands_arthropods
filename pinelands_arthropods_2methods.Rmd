@@ -7,6 +7,8 @@ library(dplyr)
 library(metacoder)
 library(readxl)
 library(ggplot2)
+library(stringr)
+library(taxa)
 select <- dplyr::select
 
 # read in family name look up 
@@ -160,6 +162,9 @@ coleop <- coleop_all_step1 %>%
          final_ID, starts_with("sample")) %>%
   arrange(primer, phyllum, class, order, family, final_ID)
 
+rm(coleop_all_step1, coleop_nonarth_lookup,
+   nonarth, nonarth_step1)
+
 # ULTIMATELY WILL ADD PHYLLUM/CLASS/ORDER TAXONOMY TO FAMLOOKUP ABOVE
 # THAT WILL CONDENSE THE CODE CONSIDERABLY
 
@@ -200,6 +205,8 @@ zeale <- zeale_step1 %>%
          final_ID, starts_with("sample")) %>%
   arrange(primer, phyllum, class, order, family, final_ID)
 
+rm(nonarth_zeale_step1, zeale_step1)
+
 # combine data sets
 data_full <- zeale %>%
   bind_rows(coleop)
@@ -212,8 +219,8 @@ art <- data_full %>%
   ungroup() %>%
   mutate(lineage = paste0("r__Arthro.;c__", class, ";o__", order, ";f__", family))
 
-# otu count by family for arthropods (both primers separate) # aka d_otus
-n_otus <- art %>%
+# otu count by family for arthropods (both primers separate)
+n_otus_primer <- art %>%
   select(primer, lineage, starts_with("sample")) %>%
   mutate(across(.cols = starts_with("sample"), 
                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
@@ -222,13 +229,16 @@ n_otus <- art %>%
             .groups = "drop") %>%
   mutate('sample:1DS' = 0,
          'sample:9DS' = 0,
-         'sample:3DS' = 0) %>%
+         'sample:3DS' = 0)
+
+# otu count by family for arthropods (max of 2 primers)
+n_otus_max <- n_otus_primer %>%
   group_by(lineage) %>%
   # max number of OTUs detected by either primer set
   summarise(across(starts_with("sample"), max))
 
 # rename columns
-new_col_names <- n_otus %>% 
+new_col_names <- n_otus_max %>% 
   select(starts_with("sample")) %>%
   colnames() %>%
   substr(., 1, 11) %>%
@@ -236,10 +246,10 @@ new_col_names <- n_otus %>%
   gsub(., pattern = "B", replacement = "") %>%
   gsub(., pattern = "Z", replacement = "")
 
-colnames(n_otus) <- c("lineage", new_col_names)
+colnames(n_otus_max) <- c("lineage", new_col_names)
 
 # family presence/absence for arthropods (both primers combined)
-pa_fam <- n_otus %>%
+pa_fam <- n_otus_max %>%
   mutate(across(starts_with("sample"),
                 .fns = function(x) ifelse(x > 0,1,0)))
 
@@ -254,67 +264,305 @@ pa_fam_r <- pa_fam %>%
   select(contains("CR"), contains("DR")) %>%
   as.matrix()
 
-# make a data frame listing which species each method found
+pa_fam_array <- array(NA, dim = c(177, 20, 2))
+pa_fam_array[,,1] <- pa_fam_s
+pa_fam_array[,,2] <- pa_fam_r
+pa_fam_both <- apply(pa_fam_array, c(1,2), max)
+
+# make a data frame of prevalence of each family by method
 pasum <- data.frame(
   lineage = pa_fam$lineage,
   spray.pa = apply(pa_fam_s, 1, mean),
-  roll.pa = apply(pa_fam_r, 1, mean))
+  roll.pa = apply(pa_fam_r, 1, mean),
+  both.pa = apply(pa_fam_both, 1, mean)) %>%
+  arrange(desc(roll.pa)) %>%
+  mutate(roll.rank = 1:length(roll.pa)) %>%
+  arrange(desc(spray.pa)) %>%
+  mutate(spray.rank = 1:length(spray.pa)) %>%
+  mutate(whichdet = case_when(roll.pa > 0 & spray.pa > 0 ~ 0,
+                              roll.pa > 0 & spray.pa == 0 ~ 1,
+                              roll.pa == 0 & spray.pa > 0 ~ -1))
 
+d_samples <- data.frame(sample_id = colnames(pa_fam)[2:41]) %>%
+  mutate(Method = stringr::str_sub(sample_id, -1,-1),
+         Tree = stringr::str_sub(sample_id, -2,-2),
+         Samp = sample_id)
+
+str_sub(d_samples$Samp, -1,-1) <- ""
+
+
+
+
+
+
+
+
+
+# dl <- read.csv("data/ITS_CO1datacombined.csv") %>%
+#   select(fam, hab, feed, size_cat, Soil1:Water2) %>%
+#     filter(fam != "",
+#          fam != "Chaoboridae", # fully aquatic
+#          fam != "Coenagrionidae") %>% # fully aquatic
+#   pivot_longer(cols = Soil1:Water2) %>%
+#   mutate(type = substr(name, 1,3)) %>%
+#   group_by(fam, hab, feed, size_cat, type) %>%
+#   summarize(total = sum(value)) %>%
+#   ungroup() %>%
+#   arrange(type, fam) %>%
+#   filter(is.na(fam) != T) %>%
+#   mutate(Method = case_when(type == "Soi" ~ "Soil",
+#                             type == "Spr" ~ "Spray",
+#                             type == "Rol" ~ "Roller",
+#                             type == "Wat" ~ "Water"),
+#          Guild = case_when(feed == "Omin" ~ "Omnivore",
+#                            feed == "Para" ~ "Parasitoid",
+#                            feed == "Pred/phyto" ~ "Mixed",
+#                            feed == "Predator, Phyto" ~ "Mixed",
+#                            feed == "Variety" ~ "Mixed",
+#                            feed == "Phyto" ~ "Phytoph.",
+#                            feed == "Predator" ~ "Predator"),
+#          Habitat = case_when(hab == "T" ~ "Terrestrial",
+#                            hab == "A" ~ "Aquatic",
+#                            hab == "A/T" ~ "Mixed"),
+# # 0-5=tiny, 5-10=small; 10-20 medium, 20+ large
+#          Body_Size = case_when(size_cat == "Large" ~ ">20 mm",
+#                                size_cat == "Medium" ~ "10-20 mm",
+#                                size_cat == "Small" ~ "5-10 mm",
+#                                size_cat == "Tiny" ~ "<5 mm",
+#                                size_cat == "" ~ "Unknown"),
+#          Body_Size_order = case_when(Body_Size == "<5 mm" ~ 5,
+#                            Body_Size == "5-10 mm" ~ 4,
+#                            Body_Size == "10-20 mm" ~ 3,
+#                            Body_Size == ">20 mm" ~ 2,
+#                            Body_Size == "Unknown" ~ 1),
+#          Habitat_order = case_when(Habitat == "Terrestrial" ~ 2,
+#                            Habitat == "Aquatic" ~ 3,
+#                            Habitat == "Mixed" ~ 1),
+#          Guild_order = case_when(Guild == "Predator" ~ 5,
+#                            Guild == "Phytoph." ~ 4,
+#                            Guild == "Omnivore" ~ 3,
+#                            Guild == "Parasitoid" ~ 2,
+#                            Guild == "Mixed" ~ 1))
+```
+# Prevalence of families by method
+```{r}
 pasum %>%
-  ggplot2::gg
+  ggplot(aes(x = jitter(roll.pa*100), y = jitter(spray.pa*100))) +
+  geom_point(size = 4, alpha = .75, 
+             color = "black", shape = 1) +
+  geom_smooth(color = "black",
+              level = 0.95) +
+  labs(x = "Prevalence in roller samples (%)",
+       y = "Prevalence in spray samples (%)") +
+  theme_classic() +
+  theme(text = element_text(size = 14))
 
-d_samples <- data.frame(sample_id = colnames(p_fam),
-                        Method = c(rep("Soil", 5), rep("Roller", 3), 
-                                   rep("Spray", 3), rep("Water", 2)))
+ggsave("figures/PlotA_family_prevalence_roller_spray.jpg", 
+       height = 6, width = 6, dpi = 400)
+```
+# Family abundance distribution by method
+```{r}
+pasum %>%
+  select(rank = roll.rank, pa = roll.pa) %>%
+  bind_rows(select(pasum, rank = spray.rank, pa = spray.pa)) %>%
+  mutate(method = c(rep("Roller", 177), rep("Spray", 177))) %>%
+  ggplot() +
+  geom_line(aes(x = rank, y = pa*100, color = method), 
+             size = 1) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  labs(x = "Families (rank order)",
+       y = "Prevalence in samples (%)",
+       color = "") +
+  theme_classic() +
+  theme(text = element_text(size = 14),
+        legend.position = c(.8,.8))
 
-dl <- read.csv("data/ITS_CO1datacombined.csv") %>%
-  select(fam, hab, feed, size_cat, Soil1:Water2) %>%
-    filter(fam != "",
-         fam != "Chaoboridae", # fully aquatic
-         fam != "Coenagrionidae") %>% # fully aquatic
-  pivot_longer(cols = Soil1:Water2) %>%
-  mutate(type = substr(name, 1,3)) %>%
-  group_by(fam, hab, feed, size_cat, type) %>%
-  summarize(total = sum(value)) %>%
-  ungroup() %>%
-  arrange(type, fam) %>%
-  filter(is.na(fam) != T) %>%
-  mutate(Method = case_when(type == "Soi" ~ "Soil",
-                            type == "Spr" ~ "Spray",
-                            type == "Rol" ~ "Roller",
-                            type == "Wat" ~ "Water"),
-         Guild = case_when(feed == "Omin" ~ "Omnivore",
-                           feed == "Para" ~ "Parasitoid",
-                           feed == "Pred/phyto" ~ "Mixed",
-                           feed == "Predator, Phyto" ~ "Mixed",
-                           feed == "Variety" ~ "Mixed",
-                           feed == "Phyto" ~ "Phytoph.",
-                           feed == "Predator" ~ "Predator"),
-         Habitat = case_when(hab == "T" ~ "Terrestrial",
-                           hab == "A" ~ "Aquatic",
-                           hab == "A/T" ~ "Mixed"),
-# 0-5=tiny, 5-10=small; 10-20 medium, 20+ large
-         Body_Size = case_when(size_cat == "Large" ~ ">20 mm",
-                               size_cat == "Medium" ~ "10-20 mm",
-                               size_cat == "Small" ~ "5-10 mm",
-                               size_cat == "Tiny" ~ "<5 mm",
-                               size_cat == "" ~ "Unknown"),
-         Body_Size_order = case_when(Body_Size == "<5 mm" ~ 5,
-                           Body_Size == "5-10 mm" ~ 4,
-                           Body_Size == "10-20 mm" ~ 3,
-                           Body_Size == ">20 mm" ~ 2,
-                           Body_Size == "Unknown" ~ 1),
-         Habitat_order = case_when(Habitat == "Terrestrial" ~ 2,
-                           Habitat == "Aquatic" ~ 3,
-                           Habitat == "Mixed" ~ 1),
-         Guild_order = case_when(Guild == "Predator" ~ 5,
-                           Guild == "Phytoph." ~ 4,
-                           Guild == "Omnivore" ~ 3,
-                           Guild == "Parasitoid" ~ 2,
-                           Guild == "Mixed" ~ 1))
+ggsave("figures/PlotB_family_abundance_distribution_roller_spray.jpg", 
+       height = 6, width = 6, dpi = 400)
+```
+# Format data for the heat trees
+```{r}
+# obj <- parse_tax_data(pasum,
+#                       class_cols = "lineage", 
+#                       class_sep = ";", 
+#                       class_regex = "^(.+)__(.+)$", # Regex 
+#                       class_key = c(tax_rank = "info", 
+#                                     # key describing each regex group
+#                                     tax_name = "taxon_name"))
+
+obj <- parse_tax_data(n_otus_max,
+                      class_cols = "lineage", 
+                      class_sep = ";", 
+                      class_regex = "^(.+)__(.+)$", # Regex 
+                      class_key = c(tax_rank = "info", 
+                                    # key describing each regex group
+                                    tax_name = "taxon_name"))
+
+# relativizing data
+obj$data$tax_data_p <- calc_obs_props(obj, "tax_data")
+
+#Getting per-taxon information
+obj$data$tax_abund <- calc_taxon_abund(obj, "tax_data",
+                                       cols = d_samples$sample_id,
+                                       groups = d_samples$Method)
+
+#Getting per-taxon information (proportional data)
+obj$data$tax_abund_p <- calc_taxon_abund(obj, "tax_data_p",
+                                       cols = d_samples$sample_id,
+                                       groups = d_samples$Method)
+
+# Getting per-taxon information (proportional data)
+obj$data$tax_abund_p2 <- calc_taxon_abund(obj, "tax_data_p",
+                                       cols = d_samples$sample_id)
+
+# create a variable that indicates which method(s) detected
+makewhich <- obj$data$tax_abund %>%
+  mutate(which = case_when(S > 0 & R > 0 ~ 0,
+                           S > 0 & R == 0 ~ 1,
+                           S == 0 & R > 0 ~ -1))
+
+obj$data$tax_abund <- makewhich
+
+#Getting per-taxon information for 'number of samples'
+obj$data$tax_abund1 <- calc_taxon_abund(obj, "tax_data",
+                                       cols = d_samples$sample_id)
+
+# calculate the number of samples that have reads for each taxon
+obj$data$tax_occ <- calc_n_samples(obj, "tax_abund1", groups = d_samples$Method, cols = d_samples$sample_id)
+
+# calculate the number of samples that have reads for each taxon
+obj$data$tax_occ1 <- calc_n_samples(obj, "tax_abund1", groups = d_samples$Samp, cols = d_samples$sample_id)
+
+obj$data$tax_occ$any <- apply(obj$data$tax_occ1[,2:21], 1, function(x) sum(x>0))
+
+obj$data$tax_occ$p_any <- 100*obj$data$tax_occ$any/20
+
+obj$data$diff_table <- compare_groups(obj,
+                                      data = "tax_abund_p",
+                 cols = colnames(obj$data$tax_abund_p)[2:3],
+                  groups = colnames(obj$data$tax_abund_p)[2:3]) 
+
+obj$data$diff_table2 <- compare_groups(obj,
+                                      data = "tax_abund_p2", groups = d_samples$Method, cols = d_samples$sample_id) 
+
+# Look at data frames
+obj$data$tax_abund
+obj$data$tax_occ
+obj$data$tax_data
+obj$data$class_data
+```
+# Make heat tree
+```{r}
+set.seed(4) # This makes the plot appear the same each time it is run 
+(sprayroll <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_occ$p_any,
+          node_color = obj$data$tax_abund$which, 
+          node_color_digits = 0,
+          node_size_digits = 0,
+          node_color_trans = "linear",
+          node_color_interval = c(-1,1),
+          node_size_interval = c(0,100),
+          node_size_axis_label = "Prop. sites",
+          node_color_axis_label = "",
+          node_color_range = c("steelblue", "#CBC3E3", "firebrick"),
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford" #+ "automatic"
+          ) 
+    # theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    # annotate(geom = "text", x = .9, y = .9, label = "Soil", size = 9)
+  )
+
+# ggsave("figures/PlotC_Spray_Roll4_seed4.jpg",
+#    width = 7, height = 7, dpi = 400)
+
+```
+# Heat tree of log2 ratio of median proportions
+```{r}
+
+dif_tab <- obj$data$diff_table2
+
+set.seed(4)
+dev.new(10,10)
+heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_occ$p_any,
+          node_color = obj$data$diff_table2$log2_median_ratio, 
+          node_color_interval = c(-3, 3), 
+          node_color_range = diverging_palette(), 
+          node_color_digits = 2,
+          node_size_digits = 0,
+          node_size_axis_label = "% of sites",
+          node_color_axis_label = "Log 2 ratio of median proportions",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") 
 ```
 
-# Feeding Guild
+
+
+
+
+# Species accumulation curves
+used code from here: https://rpubs.com/Roeland-KINDT/694021
+and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
+```{r}
+library(BiodiversityR) # also loads vegan
+# library(ggsci)
+# library(readxl)
+
+spray_mat <- pa_fam_s %>%
+  t()
+spray_roll_mat[spray_roll_mat>0] <- 1 
+
+roll_mat <- pa_fam_r %>%
+  t()
+roll_mat[roll_mat>0] <- 1 
+
+accum.spray <- accumcomp(spray_mat, 
+                     y=data.frame(method = rep("spray", 
+                                               nrow(spray_mat))),
+                     factor='method', 
+  method='exact', conditioned=FALSE, plotit=FALSE)
+accum.spray
+
+accum.roll <- accumcomp(roll_mat, 
+                     y=data.frame(method = rep("roll", 
+                                               nrow(roll_mat))),
+                     factor='method', 
+  method='exact', conditioned=FALSE, plotit=FALSE)
+accum.roll
+
+plot.data.spray <- data.frame(samples = c(accum.spray[,,1]), 
+           s = c(accum.spray[,,2]), 
+           sd = c(accum.spray[,,3]),
+           method = "Spray")
+
+plot.data.roll <- data.frame(samples = c(accum.roll[,,1]), 
+           s = c(accum.roll[,,2]), 
+           sd = c(accum.roll[,,3]),
+           method = "Roller")
+
+plot.data <- plot.data.spray %>%
+  bind_rows(plot.data.roll)
+
+ggplot(plot.data) +
+  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+                  ymax = s+2*sd, fill = method),
+              alpha = 0.5) +  
+  geom_line(aes(x = samples, y = s, group = method), size = 1) +
+  scale_fill_manual(values = c("steelblue", "firebrick")) +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.85, 0.2)) +
+  labs(x = "No. samples", y = "No. families", fill = "")
+
+
+ggsave("figures/PlotD_species_accumulation_curve_spray_roll.png",
+       dpi = 600, width = 6, height = 4)
+```
+
+
+# Feeding guild
 ```{r}
 (feed <- dl %>%
     mutate(Guild = fct_reorder(Guild, desc(Guild_order))) %>%
@@ -365,202 +613,3 @@ grid.arrange(feed, size, hab, ncol=3)
 
 # ggsave("figures/whos_there_no_aquatic.jpg", arrangeGrob(feed, size, hab), width= 7, height = 7, dpi = 500)
 ```
-
-```{r}
-library(taxa)
-obj <- parse_tax_data(d_otus,
-                      class_cols = "lineage", 
-                      class_sep = ";", 
-                      class_regex = "^(.+)__(.+)$", # Regex 
-                      class_key = c(tax_rank = "info", # key describing each regex group
-                                    tax_name = "taxon_name"))
-
-# convert to proportions
-# obj$data$tax_data <- calc_obs_props(obj, "tax_data")
-
-#Getting per-taxon information
-obj$data$tax_abund <- calc_taxon_abund(obj, "tax_data",
-                                       cols = d_samples$sample_id,
-                                       groups = d_samples$Method)
-obj$data$tax_abund$Soil_per <- obj$data$tax_abund$Soil/5
-obj$data$tax_abund$Roller_per <- obj$data$tax_abund$Roller/3
-obj$data$tax_abund$Spray_per <- obj$data$tax_abund$Spray/3
-obj$data$tax_abund$Water_per <- obj$data$tax_abund$Water/2
-
-
-#Getting per-taxon information for 'number of samples'
-obj$data$tax_abund1 <- calc_taxon_abund(obj, "tax_data",
-                                       cols = d_samples$sample_id)
-
-# calculate the number of samples that have reads for each taxon
-obj$data$tax_occ <- calc_n_samples(obj, "tax_abund1", groups = d_samples$Method, cols = d_samples$sample_id)
-
-# calculate the number of methods that detected each taxon
-obj$data$tax_occ$num_methods <- (obj$data$tax_occ$Soil>0) +
-  (obj$data$tax_occ$Roller>0) +
-  (obj$data$tax_occ$Spray>0) +
-  (obj$data$tax_occ$Water>0)
-
-# calculate mean number of taxa detected across all methods
-obj$data$tax_abund$All_per <- (obj$data$tax_abund$Soil_per +
-  obj$data$tax_abund$Roller_per + 
-  obj$data$tax_abund$Spray_per +
-  obj$data$tax_abund$Water_per)/4
-
-
-```
-# Make heat trees
-```{r}
-# Soil
-set.seed(1) # This makes the plot appear the same each time it is run 
-(soil <- heat_tree(obj, 
-          node_label = taxon_names,
-          node_size = obj$data$tax_abund$Soil_per,
-          node_color = obj$data$tax_occ$Soil, 
-          node_color_digits = 2,
-          node_color_trans = "linear",
-          node_color_interval = c(0,5),
-          node_size_axis_label = "Mean OTUs / sample",
-          node_color_axis_label = "Samples with reads",
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford") +
-    theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
-    annotate(geom = "text", x = .9, y = .9, label = "Soil", size = 9)
-  )
- # ggsave("figures/Soil_tree_abund2_margin.jpg", 
-        # width = 7, height = 7, dpi = 400)
-
-# Roller
-set.seed(1) # This makes the plot appear the same each time it is run 
-(roller <- heat_tree(obj, 
-          node_label = taxon_names,
-          node_size = obj$data$tax_abund$Roller_per,
-          node_color = obj$data$tax_occ$Roller,
-          node_color_digits = 2,
-          node_color_trans = "linear",
-          node_color_interval = c(0,3),
-          node_size_axis_label = "Mean OTUs / sample",
-          node_color_axis_label = "Samples with reads",
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford") %>%
-  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
-    annotate(geom = "text", x = .9, y = .9, label = "Roller", size = 9)
-  )
-# ggsave("figures/Roller_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
-
-# Spray
-set.seed(1) # This makes the plot appear the same each time it is run 
-(spray <- heat_tree(obj, 
-          node_label = taxon_names,
-          node_size = obj$data$tax_abund$Spray_per,
-          node_color = obj$data$tax_occ$Spray,
-          node_color_digits = 1,
-          node_color_trans = "linear",
-          node_color_interval = c(0,3),
-          node_size_axis_label = "Mean OTUs / sample",
-          node_color_axis_label = "Samples with reads",
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford") %>%
-  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
-    annotate(geom = "text", x = .9, y = .9, label = "Spray", size = 9)
-  )
-# ggsave("figures/Spray_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
-
-# Water
-set.seed(1) # This makes the plot appear the same each time it is run 
-(water <- heat_tree(obj, 
-          node_label = taxon_names,
-          node_size = obj$data$tax_abund$Water_per,
-          node_color = obj$data$tax_occ$Water,
-          node_color_digits = 1,
-          node_color_trans = "linear",
-          node_color_interval = c(0,2),
-          node_size_axis_label = "Mean OTUs / sample",
-          node_color_axis_label = "Samples with reads",
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford") %>%
-  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
-    annotate(geom = "text", x = .9, y = .9, label = "Water", size = 9) 
-)
-# ggsave("figures/Water_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
-
-# 4-panel figure
-g <- gridExtra::grid.arrange(roller, spray, soil, water)
-
-ggsave("figures/heat_tree_collage_grid5.svg", g, 
-       height = 9, width = 9, dpi = 400)
-```
-# Make heat tree showing number of methods that detected each taxa
-```{r}
-set.seed(1) # This makes the plot appear the same each time it is run 
-(methods <- heat_tree(obj, 
-          node_label = taxon_names,
-          node_size = obj$data$tax_abund$All_per,
-          node_color = obj$data$tax_occ$num_methods, 
-          node_size_axis_label = "Mean OTUs / sample",
-          node_color_axis_label = "No. methods with reads",
-          node_color_range = c("gray", "darkgoldenrod1", "steelblue"),
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford")) # The layout algorithm 
-# ggsave("figures/methods_tree_abund2.svg", width = 7, height = 7, dpi = 400)
-```
-# Species accumulation curves
-used code from here: https://rpubs.com/Roeland-KINDT/694021
-and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
-```{r}
-library(BiodiversityR) # also loads vegan
-library(ggplot2)
-# library(ggsci)
-# library(readxl)
-
-spray_roll_mat <- as.matrix(select(d_otus, starts_with("Roll"), 
-                                starts_with("Spray"))) %>%
-  t()
-spray_roll_mat[spray_roll_mat>0] <- 1 
-
-soil_mat <- as.matrix(select(d_otus, starts_with("Soil"))) %>%
-  t()
-soil_mat[soil_mat>0] <- 1 
-
-
-accum.spray_roll <- accumcomp(spray_roll_mat, 
-                     y=data.frame(method = rep("spray_roll", 6)),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.spray_roll
-
-accum.soil <- accumcomp(soil_mat, 
-                     y=data.frame(method = rep("soil", 5)),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.soil
-
-plot.data.spray_roll <- data.frame(samples = c(accum.spray_roll[,,1]), 
-           s = c(accum.spray_roll[,,2]), 
-           sd = c(accum.spray_roll[,,3]),
-           method = "spray_roll")
-
-plot.data.soil <- data.frame(samples = c(accum.soil[,,1]), 
-           s = c(accum.soil[,,2]), 
-           sd = c(accum.soil[,,3]),
-           method = "soil")
-
-plot.data <- plot.data.spray_roll %>%
-  bind_rows(plot.data.soil)
-
-ggplot(plot.data) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  scale_fill_manual(values = c("darkgreen", "steelblue")) +
-  theme_bw() +
-  theme(text = element_text(size = 14)) +
-  labs(x = "No. samples", y = "No. families")
-
-
-# ggsave("species_accumulation_curve_spray_roll_soil.png", 
-#        dpi = 600, width = 6, height = 4)
-```
-
-
