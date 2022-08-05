@@ -9,6 +9,8 @@ library(readxl)
 library(ggplot2)
 library(stringr)
 library(taxa)
+library(vegan)
+library(BiodiversityR)
 select <- dplyr::select
 
 # read in family name look up 
@@ -219,6 +221,11 @@ art <- data_full %>%
   ungroup() %>%
   mutate(lineage = paste0("r__Arthro.;c__", class, ";o__", order, ";f__", family))
 
+# make family-lineage lookup table
+lineage_lookup <- art %>%
+  dplyr::select(family, lineage) %>%
+  distinct()
+
 # otu count by family for arthropods (both primers separate)
 n_otus_primer <- art %>%
   select(primer, lineage, starts_with("sample")) %>%
@@ -290,59 +297,6 @@ d_samples <- data.frame(sample_id = colnames(pa_fam)[2:41]) %>%
 
 str_sub(d_samples$Samp, -1,-1) <- ""
 
-
-
-
-
-
-
-
-
-# dl <- read.csv("data/ITS_CO1datacombined.csv") %>%
-#   select(fam, hab, feed, size_cat, Soil1:Water2) %>%
-#     filter(fam != "",
-#          fam != "Chaoboridae", # fully aquatic
-#          fam != "Coenagrionidae") %>% # fully aquatic
-#   pivot_longer(cols = Soil1:Water2) %>%
-#   mutate(type = substr(name, 1,3)) %>%
-#   group_by(fam, hab, feed, size_cat, type) %>%
-#   summarize(total = sum(value)) %>%
-#   ungroup() %>%
-#   arrange(type, fam) %>%
-#   filter(is.na(fam) != T) %>%
-#   mutate(Method = case_when(type == "Soi" ~ "Soil",
-#                             type == "Spr" ~ "Spray",
-#                             type == "Rol" ~ "Roller",
-#                             type == "Wat" ~ "Water"),
-#          Guild = case_when(feed == "Omin" ~ "Omnivore",
-#                            feed == "Para" ~ "Parasitoid",
-#                            feed == "Pred/phyto" ~ "Mixed",
-#                            feed == "Predator, Phyto" ~ "Mixed",
-#                            feed == "Variety" ~ "Mixed",
-#                            feed == "Phyto" ~ "Phytoph.",
-#                            feed == "Predator" ~ "Predator"),
-#          Habitat = case_when(hab == "T" ~ "Terrestrial",
-#                            hab == "A" ~ "Aquatic",
-#                            hab == "A/T" ~ "Mixed"),
-# # 0-5=tiny, 5-10=small; 10-20 medium, 20+ large
-#          Body_Size = case_when(size_cat == "Large" ~ ">20 mm",
-#                                size_cat == "Medium" ~ "10-20 mm",
-#                                size_cat == "Small" ~ "5-10 mm",
-#                                size_cat == "Tiny" ~ "<5 mm",
-#                                size_cat == "" ~ "Unknown"),
-#          Body_Size_order = case_when(Body_Size == "<5 mm" ~ 5,
-#                            Body_Size == "5-10 mm" ~ 4,
-#                            Body_Size == "10-20 mm" ~ 3,
-#                            Body_Size == ">20 mm" ~ 2,
-#                            Body_Size == "Unknown" ~ 1),
-#          Habitat_order = case_when(Habitat == "Terrestrial" ~ 2,
-#                            Habitat == "Aquatic" ~ 3,
-#                            Habitat == "Mixed" ~ 1),
-#          Guild_order = case_when(Guild == "Predator" ~ 5,
-#                            Guild == "Phytoph." ~ 4,
-#                            Guild == "Omnivore" ~ 3,
-#                            Guild == "Parasitoid" ~ 2,
-#                            Guild == "Mixed" ~ 1))
 ```
 # Prevalence of families by method
 ```{r}
@@ -496,10 +450,7 @@ ggsave("figures/PlotD_Spray_Roll_difference.jpg",
 used code from here: https://rpubs.com/Roeland-KINDT/694021
 and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
 ```{r}
-library(BiodiversityR) # also loads vegan
-# library(ggsci)
-# library(readxl)
-
+# format data matrices
 spray_mat <- pa_fam_s %>%
   t()
 spray_roll_mat[spray_roll_mat>0] <- 1 
@@ -550,12 +501,10 @@ ggplot(plot.data) +
 ggsave("figures/PlotE_species_accumulation_curve_spray_roll.jpg",
        dpi = 600, width = 6, height = 4)
 ```
-# Spray vs Roller, conifer vs. deciduous NMDS
+# NMDS Spray vs Roller, conifer vs. deciduous 
 ```{r}
-library(vegan)
-library(BiodiversityR)
-library(MASS)
 
+# format data matrix
 mds_data <- rbind(t(pa_fam_r),
                   t(pa_fam_s))
 
@@ -565,6 +514,7 @@ mds_data_nb <- mds_data[-which(rownames(mds_data) %in%
                                        "sample3DS",
                                        "sample9DS")),]
 
+# format covariate data
 env.data <- data.frame(tree = str_sub(rownames(mds_data_nb), 
                                       -2, -2),
                        method = str_sub(rownames(mds_data_nb), 
@@ -574,22 +524,8 @@ env.data <- data.frame(tree = str_sub(rownames(mds_data_nb),
          method = case_when(method == "R" ~ "Roller",
                             method == "S" ~ "Spray"))
 
-distances <- vegdist(mds_data_nb, method = "jaccard")
-arthMDS <- isoMDS(distances, maxit = 300)
-
-# plot results
-arthMDS.df <- arthMDS$points %>%
-  as.data.frame() %>%
-  bind_cols(env.data)
-
-arthMDS.df %>%
-  ggplot() +
-  geom_point(aes(x = V1, y = V2, color = method, shape = tree),
-  size = 5) +
-  coord_fixed(ratio = 1)
-
-
 # package vegan NMDS
+set.seed(1)
 arthNMDS = metaMDS(mds_data_nb,
                      k=2, distance = 'jaccard', trymax = 1000) 
 
@@ -645,64 +581,158 @@ summary(method_anosim) # p 0.001
 
 tree_anosim <- anosim(mds_data_nb, grouping = env.data$tree)
 summary(tree_anosim) # p ~ 0.1
-
-
-
 ```
-
-
-
-
-
-# rarefy & diversity code from metabarcoding workshop
-```{r}
-# t_fishfarm is a sample x MOTU matrix filled with reads
-min_depth_fishfarm <- min(rowSums(t_fishfarm))
-
-# rarefaction curves
-fishfarm.curve <-
-  rarecurve(
-    t_fishfarm_curve, # same as t_fishfarm
-    step = 20,
-    sample = min_depth_fishfarm,
-    col = nrow(t_fishfarm), # number of samples
-    label = T
-  )
-
-fishfarm_rare <- rrarefy(t_fishfarm, min_depth_fishfarm)
-
-# Alpha diversity - Shannon index
-# W/o rarefying
-H_fish_norar <- diversity(t_fishfarm, index = "shannon", MARGIN = 1, base = exp(1))
-
-# w/ rarefying
-H_fish_rar <- diversity(fishfarm_rare, index = "shannon", MARGIN = 1, base = exp(1))
-
-
-
-
-```
-
-
-
-
-
-
 # Feeding guild
 ```{r}
-(feed <- dl %>%
-    mutate(Guild = fct_reorder(Guild, desc(Guild_order))) %>%
-ggplot(aes(x = Method, y = total, fill = Guild)) +
+feed_step1 <- diet %>%
+  select(family, diet.cat) %>%
+  left_join(lineage_lookup) %>%
+  right_join(n_otus_max) %>%
+  group_by(diet.cat) %>%
+  summarize(across(starts_with("sample"), 
+                   .fns = function(x) sum(x > 0)),
+            .groups = "drop")
+
+feedcats <- feed_step1$diet.cat
+feed <- feed_step1 %>%
+  select(starts_with("sample")) %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(sample_id = colnames(feed_step1)[2:41],
+         method = str_sub(sample_id, -1,-1),
+         tree = str_sub(sample_id, -2,-2)) %>%
+  group_by(method, tree) %>%
+  summarize(across(contains("V"), mean),
+            .groups = "drop")
+colnames(feed) <- c("method", "tree", feedcats)
+rm(feed_step1, feedcats)
+
+feed_df <- feed %>% 
+  tidyr::pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
+  mutate(diet.cat = case_when(name == 
+                                "detritophagous/scavenger" ~ 
+                                "scavenger",
+                              name == 
+                                "phytophagous-galls/miners" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-multiple/other" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-phyllophagous" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-sap sucking" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-saproxylic" ~
+                                "phytophagous",
+                              name == 
+                                "zoophagous-parasite/parasitoid" ~
+                                "parasite/parasitoid",
+                              name == 
+                                "zoophagous-predator" ~
+                                "predator",
+                              TRUE ~ name),
+         tree = case_when(tree == "C" ~ "Coniferous",
+                          tree == "D" ~ "Deciduous"),
+         method = case_when(method == "R" ~ "Roller",
+                          method == "S" ~ "Spray"))
+  
+(feed_plot <- 
+  ggplot(data = feed_df, 
+       aes(x = method, y = value, fill = diet.cat)) +
   theme_bw() +
   viridis::scale_fill_viridis(discrete=TRUE) +
   geom_bar(stat="identity", position = "fill") +
   scale_y_continuous(labels = scales::percent) +
-  ylab ("Proportion of OTUs") + 
-  xlab("") +
+  facet_wrap(~tree) +
+  labs(y = "% of families", x = "", 
+       fill = "") +
   ggtitle("Feeding Guild") +
-  theme(axis.text.x = element_text(size = 15)))
-# ggsave("figures/feeding_guild_no_aquatic.jpg", width = 6, height = 6, dpi = 400)
+  theme(axis.text.x = element_text(size = 15),
+        strip.background = element_rect(fill = "white"))
+)
+ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
+       width = 6, height = 4, dpi = 400)
 ```
+# Habitat / life mode
+```{r}
+lifemode %>%
+  select(family, diet.cat) %>%
+  left_join(lineage_lookup) %>%
+  right_join(n_otus_max) %>%
+  group_by(diet.cat) %>%
+  summarize(across(starts_with("sample"), 
+                   .fns = function(x) sum(x > 0)),
+            .groups = "drop")
+
+feedcats <- feed_step1$diet.cat
+feed <- feed_step1 %>%
+  select(starts_with("sample")) %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(sample_id = colnames(feed_step1)[2:41],
+         method = str_sub(sample_id, -1,-1),
+         tree = str_sub(sample_id, -2,-2)) %>%
+  group_by(method, tree) %>%
+  summarize(across(contains("V"), mean),
+            .groups = "drop")
+colnames(feed) <- c("method", "tree", feedcats)
+rm(feed_step1, feedcats)
+
+feed_df <- feed %>% 
+  tidyr::pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
+  mutate(diet.cat = case_when(name == 
+                                "detritophagous/scavenger" ~ 
+                                "scavenger",
+                              name == 
+                                "phytophagous-galls/miners" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-multiple/other" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-phyllophagous" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-sap sucking" ~
+                                "phytophagous",
+                              name == 
+                                "phytophagous-saproxylic" ~
+                                "phytophagous",
+                              name == 
+                                "zoophagous-parasite/parasitoid" ~
+                                "parasite/parasitoid",
+                              name == 
+                                "zoophagous-predator" ~
+                                "predator",
+                              TRUE ~ name),
+         tree = case_when(tree == "C" ~ "Coniferous",
+                          tree == "D" ~ "Deciduous"),
+         method = case_when(method == "R" ~ "Roller",
+                          method == "S" ~ "Spray"))
+  
+(feed_plot <- 
+  ggplot(data = feed_df, 
+       aes(x = method, y = value, fill = diet.cat)) +
+  theme_bw() +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  geom_bar(stat="identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  facet_wrap(~tree) +
+  labs(y = "% of families", x = "", 
+       fill = "") +
+  ggtitle("Feeding Guild") +
+  theme(axis.text.x = element_text(size = 15),
+        strip.background = element_rect(fill = "white"))
+)
+ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
+       width = 6, height = 4, dpi = 400)
+```
+
 # Habitat
 ```{r}
 (hab <- dl %>%
@@ -739,3 +769,41 @@ grid.arrange(feed, size, hab, ncol=3)
 
 # ggsave("figures/whos_there_no_aquatic.jpg", arrangeGrob(feed, size, hab), width= 7, height = 7, dpi = 500)
 ```
+
+
+
+
+
+# rarefy & diversity code from metabarcoding workshop
+```{r}
+# t_fishfarm is a sample x MOTU matrix filled with reads
+min_depth_fishfarm <- min(rowSums(t_fishfarm))
+
+# rarefaction curves
+fishfarm.curve <-
+  rarecurve(
+    t_fishfarm_curve, # same as t_fishfarm
+    step = 20,
+    sample = min_depth_fishfarm,
+    col = nrow(t_fishfarm), # number of samples
+    label = T
+  )
+
+fishfarm_rare <- rrarefy(t_fishfarm, min_depth_fishfarm)
+
+# Alpha diversity - Shannon index
+# W/o rarefying
+H_fish_norar <- diversity(t_fishfarm, index = "shannon", MARGIN = 1, base = exp(1))
+
+# w/ rarefying
+H_fish_rar <- diversity(fishfarm_rare, index = "shannon", MARGIN = 1, base = exp(1))
+
+
+
+```
+
+
+
+
+
+
