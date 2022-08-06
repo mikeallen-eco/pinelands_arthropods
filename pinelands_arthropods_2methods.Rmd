@@ -11,6 +11,7 @@ library(stringr)
 library(taxa)
 library(vegan)
 library(BiodiversityR)
+library(wesanderson)
 select <- dplyr::select
 
 # read in family name look up 
@@ -459,6 +460,9 @@ roll_mat <- pa_fam_r %>%
   t()
 roll_mat[roll_mat>0] <- 1 
 
+both_mat <- spray_mat + roll_mat
+both_mat[both_mat>0] <- 1 
+
 accum.spray <- accumcomp(spray_mat, 
                      y=data.frame(method = rep("spray", 
                                                nrow(spray_mat))),
@@ -473,6 +477,13 @@ accum.roll <- accumcomp(roll_mat,
   method='exact', conditioned=FALSE, plotit=FALSE)
 accum.roll
 
+accum.both <- accumcomp(both_mat, 
+                     y=data.frame(method = rep("both", 
+                                               nrow(both_mat))),
+                     factor='method', 
+  method='exact', conditioned=FALSE, plotit=FALSE)
+accum.both
+
 plot.data.spray <- data.frame(samples = c(accum.spray[,,1]), 
            s = c(accum.spray[,,2]), 
            sd = c(accum.spray[,,3]),
@@ -483,24 +494,82 @@ plot.data.roll <- data.frame(samples = c(accum.roll[,,1]),
            sd = c(accum.roll[,,3]),
            method = "Roller")
 
+plot.data.both <- data.frame(samples = c(accum.both[,,1]), 
+           s = c(accum.both[,,2]), 
+           sd = c(accum.both[,,3]),
+           method = "Both")
+
 plot.data <- plot.data.spray %>%
-  bind_rows(plot.data.roll)
+  bind_rows(plot.data.roll) %>%
+  bind_rows(plot.data.both)
 
 ggplot(plot.data) +
   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
                   ymax = s+2*sd, fill = method),
               alpha = 0.5) +  
   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  scale_fill_manual(values = c("steelblue", "firebrick")) +
+  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
   theme_bw() +
   theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.2)) +
+        legend.position = c(0.85, 0.25)) +
   labs(x = "No. samples", y = "No. families", fill = "")
 
 
-ggsave("figures/PlotE_species_accumulation_curve_spray_roll.jpg",
+ggsave("figures/PlotE_species_accumulation_curve_spray_roll2.jpg",
        dpi = 600, width = 6, height = 4)
 ```
+# specpool: Extrapolated Species Richness
+```{r}
+# format data matrices
+spray_mat <- pa_fam_s %>%
+  t()
+spray_roll_mat[spray_roll_mat>0] <- 1 
+
+roll_mat <- pa_fam_r %>%
+  t()
+roll_mat[roll_mat>0] <- 1 
+
+both_mat <- spray_mat + roll_mat
+both_mat[both_mat>0] <- 1 
+
+specpool(roll_mat)
+# Species     chao chao.se jack1 jack1.se    jack2     boot  boot.se  n
+# 126 162.1905 15.1504   164 10.22252 182.0947 143.7408 5.816372 20
+
+specpool(spray_mat)
+# Species  chao  chao.se  jack1 jack1.se    jack2     boot  boot.se  n
+# 148 189.971 16.19735 192.65 13.10029 213.6342 168.3491 7.391802 20
+
+specpool(both_mat)
+# Species chao  chao.se  jack1 jack1.se    jack2     boot  boot.se  n
+# 177 213.1819 13.88307 221.65 12.73254 239.2237 198.2027 7.405305 20
+```
+
+# tally up families from primary and pilot study
+```{r}
+# for now, read in dl from the 4methods Rmd
+old_fam <- unique(dl$fam)
+
+all_fam <- size %>% full_join(data.frame(family = old_fam))
+# 177 families in 21 orders from primary study
+
+just_old <- all_fam %>% filter(is.na(order))
+# additional 15 families only present in pilot data
+
+just_old_sum <- dl %>% 
+  group_by(fam, Method) %>% 
+  summarize(num = sum(total)) %>%
+  filter(fam %in% just_old$family) %>% 
+  tidyr::pivot_wider(values_from = num,
+                     names_from = Method)
+
+just_old_sum_soil_water <- just_old_sum %>%
+  filter(Spray == 0 & Roller == 0)
+dl_sum_water <- dl_sum %>% filter(Method == "Water")
+
+```
+
+
 # NMDS Spray vs Roller, conifer vs. deciduous 
 ```{r}
 
@@ -801,7 +870,6 @@ H_fish_rar <- diversity(fishfarm_rare, index = "shannon", MARGIN = 1, base = exp
 
 
 ```
-
 
 
 

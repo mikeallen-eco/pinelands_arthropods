@@ -315,4 +315,3 @@ ggplot(plot.data) +
 #        dpi = 600, width = 6, height = 4)
 ```
 
-
