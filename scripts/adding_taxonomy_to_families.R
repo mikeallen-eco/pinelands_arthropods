@@ -1,3 +1,6 @@
+# This contains various scripts to assign higher taxonomic ranks
+#    and also to format the trait databases
+
 # Assigning orders to families
 # used the NCBI taxonomy to look up each family
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5887078/
@@ -79,3 +82,33 @@ orders2 <- orders %>%
 
 write.csv(orders2, "data/arthropod.families.traits.csv",
           row.names = F)
+
+
+
+#### adding higher taxa
+library(taxize)
+# add orders to the lowest taxa rank based on NCBI database
+full_taxa_lookup <- tax_name(sci = unique(famlookup$final_family), 
+                   get = c("family", "order", "class", 
+                           "phylum", "kingdom"), 
+                   db = "ncbi")
+
+
+# make new columns for the "arthropod.families" database
+
+# path for taxonomy and ecology lookup tables
+tax_data_path <- "data/arthropod.families_20220816.xlsx"
+
+# read in family name look up 
+# will use to match each OTU with an NCBI family name
+# lowest rank assigned by looking up each entry in NCBI if it didn't 
+# have a name yet from bioinformatics work
+full_taxa_lookup2 <- read_xlsx(tax_data_path, 
+                       sheet = "arthropod.families") %>%
+  select(final_lowest, final_ID = 'final species_name') %>%
+  left_join(rename(full_taxa_lookup, final_lowest = query)) %>%
+  select(-db)
+
+write.csv(full_taxa_lookup2, "data/arthropod.higher.taxa.lookup.csv",
+          row.names = F)
+
