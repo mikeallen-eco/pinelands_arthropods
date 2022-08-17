@@ -829,10 +829,14 @@ library(iNEXT)
 data(spider)
 str(spider)
 iNEXT(spider, q=0, datatype="abundance")
-coleop_rare <- iNEXT(coleop_data[[1]], q=0, datatype="abundance")
-zeale_rare <- iNEXT(coleop_data[[2]], q=0, datatype="abundance")
+coleop_rare <- iNEXT(coleop_data[[1]][,-9], q=0, datatype="abundance",
+                     knots = 100, endpoint = 3436)
+zeale_rare <- iNEXT(coleop_data[[2]][,-9], q=0, datatype="abundance",
+                    knots = 100, endpoint = 3436)
 
-both_rare <- iNEXT(coleop_data2, q=0, datatype="abundance")
+both_rare <- iNEXT(coleop_data2, q=0, datatype="abundance",
+                   knots = 100, nboot = 50)
+ggiNEXT(both_rare)
 
 plot(zeale_rare$iNextEst$`sample:3CS`$m,
      zeale_rare$iNextEst$`sample:3CS`$qD,
@@ -851,18 +855,321 @@ $AsyEst
 
 
 
-#### testing - saving if needed
+#### vegan way - alternate
 
-coleop_rare_mat
-coleop_squish <- apply(coleop_rare_mat, 2, sum) %>%
+# MOTU accumulation curves by primer set (and order)
+names(art_order) # to get column numbers of matrix
+data_cols <- 8:44
+coleop_rare_mat <- art_order %>%
+  filter(primer == "coleop") %>%
+  select(data_cols) %>%
   as.matrix() %>%
-  t()
-accum.test <- specaccum(coleop_rare_mat,
-                     y=data.frame(method = rep("coleop",
-                                               nrow(coleop_rare_mat))),
-                     factor='method',
-  method='rarefaction', conditioned=FALSE, plotit=FALSE)
-accum.test
+  t() %>%
+  as.data.frame()
+
+zeale_rare_mat <- art_order %>%
+  filter(primer == "zeale") %>%
+  select(data_cols) %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame()
+
+apply(coleop_rare_mat, 1, sum)
+sort(apply(coleop_rare_mat, 1, sum))
+apply(zeale_rare_mat, 1, sum)
+sort(apply(zeale_rare_mat, 1, sum))
+
+rarefy_coleop <- rarefy(coleop_rare_mat[-9,], 3436, se = T)
+rarefy_zeale <- rarefy(zeale_rare_mat[-9,], 3436, se = T)
+
+rarefy_coleop_df <- rarefy_coleop %>%
+  t() %>%
+  as.data.frame() %>%
+  bind_cols(colnames(rarefy_coleop),.) %>%
+  rename(sample = 1) %>%
+  mutate(primer = "Coleop")
+
+rarefy_zeale_df <- rarefy_zeale %>%
+  t() %>%
+  as.data.frame() %>%
+  bind_cols(colnames(rarefy_zeale),.) %>%
+  rename(sample = 1) %>%
+  mutate(primer = "Zeale")
+
+rarefy_df <- rarefy_coleop_df %>%
+  bind_rows(rarefy_zeale_df)
+
+rarefy_df_wide <- data.frame(
+  sample = colnames(rarefy_coleop),
+  coleop_S = rarefy_coleop[1,],
+  zeale_S = rarefy_zeale[1,],
+  coleop_se = rarefy_coleop[2,],
+  zeale_se = rarefy_zeale[2,])
+
+# plot rarefied species richness
+ggplot(rarefy_df) +
+  geom_boxplot(aes(x = primer, y = S)) +
+  geom_point(aes(x = primer, y = S))
+
+
+# now create a rarified version of the read matrixes for diversity metrics
+
+coleop_rare_mat_rare <- rrarefy(coleop_rare_mat[-9,], 3436)
+zeale_rare_mat_rare <- rrarefy(zeale_rare_mat[-9,], 3436)
+
+
+
+
+# Calculate diversity metrics
+coleop_rare_shannon <- diversity(coleop_rare_mat[-9,], 
+                               index = "shannon", 
+                               MARGIN = 1, base = exp(1)) %>%
+  as.data.frame() %>%
+  bind_cols(rownames(coleop_rare_mat[-9,]),.) %>%
+  rename(sample = 1, coleop_shannon = 2)
+
+zeale_rare_shannon <- diversity(zeale_rare_mat[-9,], 
+                               index = "shannon", 
+                               MARGIN = 1, base = exp(1)) %>%
+  as.data.frame() %>%
+  bind_cols(rownames(coleop_rare_mat[-9,]),.) %>%
+  rename(sample = 1, zeale_shannon = 2)
+
+shannon_df <- coleop_rare_shannon %>%
+  bind_cols(select(zeale_rare_shannon, -sample))
+
+# Calculate Simpsons index on rarefied data
+coleop_rare_simpson <- diversity(coleop_rare_mat[-9,], 
+                               index = "simpson") %>%
+  as.data.frame() %>%
+  bind_cols(rownames(coleop_rare_mat[-9,]),.) %>%
+  rename(sample = 1, coleop_simpson = 2)
+
+zeale_rare_simpson <- diversity(zeale_rare_mat[-9,], 
+                               index = "simpson") %>%
+  as.data.frame() %>%
+  bind_cols(rownames(zeale_rare_mat[-9,]),.) %>%
+  rename(sample = 1, zeale_simpson = 2)
+
+simpson_df <- coleop_rare_simpson %>%
+  bind_cols(select(zeale_rare_simpson, -sample))
+
+
+# Make plots
+
+ggplot(rarefy_df_wide) +
+  geom_point(aes(x = zeale_S, y = coleop_S),
+             size = 4, alpha = 0.6,
+              color = "dodgerblue") +
+  geom_smooth(aes(x = zeale_S, y = coleop_S), 
+              method = "lm",
+              color = "dodgerblue") +
+    geom_abline(slope = 1, linetype = 2) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "MOTU richness (Zeale)",
+       y = "MOTU richness (Coleop)")
+
+ggplot(shannon_df,
+       aes(x = zeale_shannon, y = coleop_shannon)) +
+  geom_point(size = 4, alpha = 0.6,
+              color = "dodgerblue") +
+  geom_smooth(method = "lm",
+              color = "dodgerblue") +
+    geom_abline(slope = 1, linetype = 2) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "Shannon diversity (Zeale)",
+       y = "Shannon diversity (Coleop)")
+
+ggplot(simpson_df,
+       aes(x = zeale_simpson, y = coleop_simpson)) +
+  geom_point(size = 4, alpha = 0.6,
+              color = "dodgerblue") +
+  geom_smooth(method = "lm",
+              color = "dodgerblue") +
+    geom_abline(slope = 1, linetype = 2) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "MOTU evenness (Zeale)",
+       y = "MOTU diversity (Coleop)")
+
+# Richness boxplot
+rarefy_stats <- rarefy_df_wide %>%
+  mutate(lc = log(coleop_S),
+         lz = log(zeale_S)) %>%
+  summarize(mean_lc = mean(lc),
+            sd_lc = sd(lc),
+            n_lc = length(lc),
+            se_lc = sd_lc/sqrt(n_lc),
+            lcl_lc = mean_lc - 2*se_lc,
+            ucl_lc = mean_lc + 2*se_lc,
+            mean_lz = mean(lz),
+            sd_lz = sd(lz),
+            n_lz = length(lz),
+            se_lz = sd_lz/sqrt(n_lz),
+            lcl_lz = mean_lz - 2*se_lz,
+            ucl_lz = mean_lz + 2*se_lz)
+
+exp(rarefy_stats)
+
+(rareS.plot <- 
+rarefy_df_wide %>%
+  select(-ends_with("_se")) %>%
+  tidyr::pivot_longer(cols = ends_with("_S")) %>%
+  mutate(name = case_when(name == "coleop_S" ~ "Coleop primer",
+                          name == "zeale_S" ~ "Zeale primer")) %>%
+  ggplot(aes(x = name, y = value)) +
+  geom_line(size = .5, alpha = .5, 
+            aes(group = sample), 
+            color = "darkgray") +
+  geom_violin(draw_quantiles = .5, aes(fill = name),
+              alpha = 0.6) +
+  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "",
+       y = "Rarefied MOTU richness") +
+  guides(fill = "none", color = "none") +
+  annotate("text", x = 2.5, y = 160, 
+           label = paste0("Means (log-normal)",
+           "\nColeop: ",
+           round(exp(rarefy_stats$mean_lc),2), 
+           ", 95% CI = [",
+           round(exp(rarefy_stats$lcl_lc),2),
+           ", ",
+           round(exp(rarefy_stats$ucl_lc),2), 
+           "]\n",
+           "Zeale: ",
+           round(exp(rarefy_stats$mean_lz),2),
+           ", 95% CI = [",
+           round(exp(rarefy_stats$lcl_lz),2),
+           ", ",
+           round(exp(rarefy_stats$ucl_lz),2),
+           "]"),
+           hjust = 1,
+           color = "darkgray")
+)
+  
+
+# Evenness boxplot
+simpson_stats <- simpson_df %>%
+  mutate(lc = coleop_simpson,
+         lz = zeale_simpson) %>%
+  summarize(mean_lc = mean(lc),
+            sd_lc = sd(lc),
+            n_lc = length(lc),
+            se_lc = sd_lc/sqrt(n_lc),
+            lcl_lc = mean_lc - 2*se_lc,
+            ucl_lc = mean_lc + 2*se_lc,
+            mean_lz = mean(lz),
+            sd_lz = sd(lz),
+            n_lz = length(lz),
+            se_lz = sd_lz/sqrt(n_lz),
+            lcl_lz = mean_lz - 2*se_lz,
+            ucl_lz = mean_lz + 2*se_lz)
+
+simpson_stats
+
+(simspon.plot <- 
+simpson_df %>%
+  tidyr::pivot_longer(cols = ends_with("_simpson")) %>%
+  mutate(name = case_when(name == "coleop_simpson" ~ "Coleop primer",
+                          name == "zeale_simpson" ~ "Zeale primer")) %>%
+  ggplot(aes(x = name, y = value)) +
+  geom_line(size = .5, alpha = .5, 
+            aes(group = sample), 
+            color = "darkgray") +
+  geom_violin(draw_quantiles = .5, aes(fill = name),
+              alpha = 0.6) +
+  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "",
+       y = "MOTU evenness (Simpson)") +
+  guides(fill = "none", color = "none") +
+  annotate("text", x = 2.5, y = 1.3,
+           label = paste0("Means",
+           "\nColeop: ",
+           round(simpson_stats$mean_lc,2),
+           ", 95% CI = [",
+           round(simpson_stats$lcl_lc,2),
+           ", ",
+           round(simpson_stats$ucl_lc,2),
+           "]\n",
+           "Zeale: ",
+           round(simpson_stats$mean_lz,2),
+           ", 95% CI = [",
+           round(simpson_stats$lcl_lz,2),
+           ", ",
+           round(simpson_stats$ucl_lz,2),
+           "]"),
+           hjust = 1,
+           vjust = 1,
+           color = "darkgray")
+)
+  
+
+# Diversity boxplot
+shannon_stats <- shannon_df %>%
+  mutate(lc = coleop_shannon,
+         lz = zeale_shannon) %>%
+  summarize(mean_lc = mean(lc),
+            sd_lc = sd(lc),
+            n_lc = length(lc),
+            se_lc = sd_lc/sqrt(n_lc),
+            lcl_lc = mean_lc - 2*se_lc,
+            ucl_lc = mean_lc + 2*se_lc,
+            mean_lz = mean(lz),
+            sd_lz = sd(lz),
+            n_lz = length(lz),
+            se_lz = sd_lz/sqrt(n_lz),
+            lcl_lz = mean_lz - 2*se_lz,
+            ucl_lz = mean_lz + 2*se_lz)
+
+shannon_stats
+
+(shannon.plot <- 
+shannon_df %>%
+  tidyr::pivot_longer(cols = ends_with("_shannon")) %>%
+  mutate(name = case_when(name == "coleop_shannon" ~ "Coleop primer",
+                          name == "zeale_shannon" ~ "Zeale primer")) %>%
+  ggplot(aes(x = name, y = value)) +
+  geom_line(size = .5, alpha = .5, 
+            aes(group = sample), 
+            color = "darkgray") +
+  geom_violin(draw_quantiles = .5, aes(fill = name),
+              alpha = 0.6) +
+  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  theme_bw() +
+  theme(text = element_text(size = 14)) +
+  labs(x = "",
+       y = "MOTU diversity (Shannon)") +
+  guides(fill = "none", color = "none") +
+  annotate("text", x = 2.5, y = 4.8,
+           label = paste0("Means",
+           "\nColeop: ",
+           round(simpson_stats$mean_lc,2),
+           ", 95% CI = [",
+           round(simpson_stats$lcl_lc,2),
+           ", ",
+           round(simpson_stats$ucl_lc,2),
+           "]\n",
+           "Zeale: ",
+           round(simpson_stats$mean_lz,2),
+           ", 95% CI = [",
+           round(simpson_stats$lcl_lz,2),
+           ", ",
+           round(simpson_stats$ucl_lz,2),
+           "]"),
+           hjust = 1,
+           vjust = 1,
+           color = "darkgray")
+)
+  
 ```
 
 
