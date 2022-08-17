@@ -801,66 +801,12 @@ H_fish_rar <- diversity(fishfarm_rare, index = "shannon", MARGIN = 1, base = exp
 
 ```
 
-# Rarefied species accumulation curves by reads
+# Rarefied species richness, shannon & simpson indexes
 ```{r}
-
-# MOTU accumulation curves by primer set (and order)
+# MOTU rarefied species richness by sample and primer set
 names(art_order) # to get column numbers of matrix
 data_cols <- 8:44
-coleop_rare_mat <- art_order %>%
-  filter(primer == "coleop") %>%
-  select(data_cols) %>%
-  as.matrix()
-
-zeale_rare_mat <- art_order %>%
-  filter(primer == "zeale") %>%
-  select(data_cols) %>%
-  as.matrix()
-
-
-coleop_data <- list(coleop = coleop_rare_mat,
-                     zeale = zeale_rare_mat)
-
-coleop_data2 <- list(coleop = apply(coleop_rare_mat,1,sum),
-                     zeale = apply(zeale_rare_mat, 1, sum))
-
-# install.packages("iNEXT")
-library(iNEXT)
-data(spider)
-str(spider)
-iNEXT(spider, q=0, datatype="abundance")
-coleop_rare <- iNEXT(coleop_data[[1]][,-9], q=0, datatype="abundance",
-                     knots = 100, endpoint = 3436)
-zeale_rare <- iNEXT(coleop_data[[2]][,-9], q=0, datatype="abundance",
-                    knots = 100, endpoint = 3436)
-
-both_rare <- iNEXT(coleop_data2, q=0, datatype="abundance",
-                   knots = 100, nboot = 50)
-ggiNEXT(both_rare)
-
-plot(zeale_rare$iNextEst$`sample:3CS`$m,
-     zeale_rare$iNextEst$`sample:3CS`$qD,
-     type = "l", col = "blue",
-     ylim = c(0,140))
-
-points(coleop_rare$iNextEst$`sample:3CS`$m,
-     coleop_rare$iNextEst$`sample:3CS`$qD,
-     type = "l", col = "red")
-
-coleop_rare$DataInfo
-$iNextEst
-$AsyEst
-
-
-
-
-
-#### vegan way - alternate
-
-# MOTU accumulation curves by primer set (and order)
-names(art_order) # to get column numbers of matrix
-data_cols <- 8:44
-coleop_rare_mat <- art_order %>%
+coleop_rare_mat <- art_full %>%
   filter(primer == "coleop") %>%
   select(data_cols) %>%
   as.matrix() %>%
@@ -879,8 +825,11 @@ sort(apply(coleop_rare_mat, 1, sum))
 apply(zeale_rare_mat, 1, sum)
 sort(apply(zeale_rare_mat, 1, sum))
 
-rarefy_coleop <- rarefy(coleop_rare_mat[-9,], 3436, se = T)
-rarefy_zeale <- rarefy(zeale_rare_mat[-9,], 3436, se = T)
+# get lowest number of reads, excluding the 1 sample with only 195
+minreads <- 3660
+
+rarefy_coleop <- rarefy(coleop_rare_mat[-9,], minreads, se = T)
+rarefy_zeale <- rarefy(zeale_rare_mat[-9,], minreads, se = T)
 
 rarefy_coleop_df <- rarefy_coleop %>%
   t() %>%
@@ -906,19 +855,10 @@ rarefy_df_wide <- data.frame(
   coleop_se = rarefy_coleop[2,],
   zeale_se = rarefy_zeale[2,])
 
-# plot rarefied species richness
-ggplot(rarefy_df) +
-  geom_boxplot(aes(x = primer, y = S)) +
-  geom_point(aes(x = primer, y = S))
-
-
 # now create a rarified version of the read matrixes for diversity metrics
 
-coleop_rare_mat_rare <- rrarefy(coleop_rare_mat[-9,], 3436)
-zeale_rare_mat_rare <- rrarefy(zeale_rare_mat[-9,], 3436)
-
-
-
+coleop_rare_mat_rare <- rrarefy(coleop_rare_mat[-9,], minreads)
+zeale_rare_mat_rare <- rrarefy(zeale_rare_mat[-9,], minreads)
 
 # Calculate diversity metrics
 coleop_rare_shannon <- diversity(coleop_rare_mat[-9,], 
@@ -955,46 +895,7 @@ simpson_df <- coleop_rare_simpson %>%
   bind_cols(select(zeale_rare_simpson, -sample))
 
 
-# Make plots
-
-ggplot(rarefy_df_wide) +
-  geom_point(aes(x = zeale_S, y = coleop_S),
-             size = 4, alpha = 0.6,
-              color = "dodgerblue") +
-  geom_smooth(aes(x = zeale_S, y = coleop_S), 
-              method = "lm",
-              color = "dodgerblue") +
-    geom_abline(slope = 1, linetype = 2) +
-  theme_bw() +
-  theme(text = element_text(size = 14)) +
-  labs(x = "MOTU richness (Zeale)",
-       y = "MOTU richness (Coleop)")
-
-ggplot(shannon_df,
-       aes(x = zeale_shannon, y = coleop_shannon)) +
-  geom_point(size = 4, alpha = 0.6,
-              color = "dodgerblue") +
-  geom_smooth(method = "lm",
-              color = "dodgerblue") +
-    geom_abline(slope = 1, linetype = 2) +
-  theme_bw() +
-  theme(text = element_text(size = 14)) +
-  labs(x = "Shannon diversity (Zeale)",
-       y = "Shannon diversity (Coleop)")
-
-ggplot(simpson_df,
-       aes(x = zeale_simpson, y = coleop_simpson)) +
-  geom_point(size = 4, alpha = 0.6,
-              color = "dodgerblue") +
-  geom_smooth(method = "lm",
-              color = "dodgerblue") +
-    geom_abline(slope = 1, linetype = 2) +
-  theme_bw() +
-  theme(text = element_text(size = 14)) +
-  labs(x = "MOTU evenness (Zeale)",
-       y = "MOTU diversity (Coleop)")
-
-# Richness boxplot
+# Richness boxplots
 rarefy_stats <- rarefy_df_wide %>%
   mutate(lc = log(coleop_S),
          lz = log(zeale_S)) %>%
@@ -1053,7 +954,7 @@ rarefy_df_wide %>%
 )
   
 
-# Evenness boxplot
+# Evenness boxplots
 simpson_stats <- simpson_df %>%
   mutate(lc = coleop_simpson,
          lz = zeale_simpson) %>%
@@ -1111,8 +1012,7 @@ simpson_df %>%
            color = "darkgray")
 )
   
-
-# Diversity boxplot
+# Diversity boxplots
 shannon_stats <- shannon_df %>%
   mutate(lc = coleop_shannon,
          lz = zeale_shannon) %>%
@@ -1152,24 +1052,112 @@ shannon_df %>%
   annotate("text", x = 2.5, y = 4.8,
            label = paste0("Means",
            "\nColeop: ",
-           round(simpson_stats$mean_lc,2),
+           round(shannon_stats$mean_lc,2),
            ", 95% CI = [",
-           round(simpson_stats$lcl_lc,2),
+           round(shannon_stats$lcl_lc,2),
            ", ",
-           round(simpson_stats$ucl_lc,2),
+           round(shannon_stats$ucl_lc,2),
            "]\n",
            "Zeale: ",
-           round(simpson_stats$mean_lz,2),
+           round(shannon_stats$mean_lz,2),
            ", 95% CI = [",
-           round(simpson_stats$lcl_lz,2),
+           round(shannon_stats$lcl_lz,2),
            ", ",
-           round(simpson_stats$ucl_lz,2),
+           round(shannon_stats$ucl_lz,2),
            "]"),
            hjust = 1,
            vjust = 1,
            color = "darkgray")
 )
   
+```
+# Plotting relative read abundance by order
+```{r}
+
+# set up plotting order df
+order_df <- data.frame(cat = unique(paste0(art_full$class, "-", 
+                                      art_full$order)),
+           order = c(2,4,1,3,6,15,9,7,10,12,8,23,
+                     14,13,11,22,16,24,5,20,19,17,21,18),
+           name = c("Spiders",
+                    "Unknown Arachnids",
+                    "Sarcoptiform mites",
+                    "Trombidiform mites",
+                    "Collembola",
+                    "Cockroaches",
+                    "Beetles",
+                    "Flies",
+                    "True bugs",
+                    "Bees, wasps, & ants",
+                    "Butterflies & moths",
+                    "Unknown insects",
+                    "Lacewings",
+                    "Crickets & grasshoppers",
+                    "Bark lice",
+                    "Fleas",
+                    "Caddisflies",
+                    "Unknown arthropods",
+                    "Centipedes",
+                    "Mayflies",
+                    "Mantids",
+                    "Dragonflies & damselflies",
+                    "Walking sticks",
+                    "Thrips"))
+                    
+
+names(art_full)
+primer_who <- art_full %>%
+  mutate(cat = paste0(class, "-", order)) %>%
+  select(primer, cat) %>%
+  bind_cols(total.reads = rowSums(art_full[,8:44])) %>%
+  group_by(primer, cat) %>%
+  summarize(total.reads = sum(total.reads),
+            .groups = "drop") %>%
+  group_by(primer) %>%
+  mutate(rel.reads = 100*total.reads / sum(total.reads)) %>%
+  ungroup() %>%
+  # this part adds primer-taxa categories that had no reads
+  right_join(expand.grid(cat = unique(paste0(art_full$class, "-", 
+                                      art_full$order)),
+                         primer = c("coleop", "zeale"))) %>%
+  # this part converts the NAs in the previous step to 0's
+  mutate(rel.reads = tidyr::replace_na(rel.reads, 0)) %>%
+  group_by(cat) %>%
+  mutate(mean_rel.reads = mean(rel.reads)) %>%
+  ungroup() %>%
+  left_join(order_df) %>%
+  mutate(name = forcats::fct_reorder(name, order, .desc = T))
+
+(who_plot <- 
+primer_who %>%
+  ggplot() +
+  geom_col(aes(y = name, x = rel.reads,
+               fill = primer),
+           position = position_dodge(),
+           alpha = 0.6) +
+  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  scale_color_manual(values = c("firebrick", "steelblue")) +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        axis.text.y = element_text(size = 12)) +
+  labs(x = "% of total reads",
+       y = "") +
+  geom_text(aes(y = name, x = rel.reads + 1.5, 
+                color = primer, 
+                label = round(rel.reads,2)),
+            position = position_dodge(width = 1),
+            size = 1.5,
+            data = filter(primer_who, rel.reads < 1))
+)
+
+```
+
+# Stitch together primer plots
+```{r}
+library(patchwork) 
+
+shannon.plot
+
 ```
 
 
