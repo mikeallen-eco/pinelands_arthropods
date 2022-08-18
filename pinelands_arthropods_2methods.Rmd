@@ -498,8 +498,6 @@ just_old_sum_soil_water <- just_old_sum %>%
 dl_sum_water <- dl_sum %>% filter(Method == "Water")
 
 ```
-
-
 # NMDS Spray vs Roller, conifer vs. deciduous 
 ```{r}
 
@@ -546,7 +544,7 @@ ggplot(sites.long1) +
              linetype = 2) +     
   scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
   scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
-    scale_color_manual(values = wes_palette("Cavalcanti1")) +
+    scale_color_manual(values = c("steelblue", "firebrick")) +
   geom_point(aes(
     x = axis1,
     y = axis2,
@@ -561,7 +559,7 @@ ggplot(sites.long1) +
   theme_bw() +
   theme(text = element_text(size = 14))
 
-ggsave("figures/PlotF_NMDS_by_method_and_tree_type.jpg",
+ggsave("figures/PlotF_NMDS_by_method_and_tree_type2.jpg",
        dpi = 600, width = 6, height = 6)
 
 
@@ -653,6 +651,7 @@ feed_df <- feed %>%
   theme(axis.text.x = element_text(size = 15),
         strip.background = element_rect(fill = "white"))
 )
+
 ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
        width = 6, height = 4, dpi = 400)
 ```
@@ -773,34 +772,6 @@ grid.arrange(feed, size, hab, ncol=3)
 
 
 
-# rarefy & diversity code from metabarcoding workshop
-```{r}
-# t_fishfarm is a sample x MOTU matrix filled with reads
-min_depth_fishfarm <- min(rowSums(t_fishfarm))
-
-# rarefaction curves
-fishfarm.curve <-
-  rarecurve(
-    t_fishfarm_curve, # same as t_fishfarm
-    step = 20,
-    sample = min_depth_fishfarm,
-    col = nrow(t_fishfarm), # number of samples
-    label = T
-  )
-
-fishfarm_rare <- rrarefy(t_fishfarm, min_depth_fishfarm)
-
-# Alpha diversity - Shannon index
-# W/o rarefying
-H_fish_norar <- diversity(t_fishfarm, index = "shannon", MARGIN = 1, base = exp(1))
-
-# w/ rarefying
-H_fish_rar <- diversity(fishfarm_rare, index = "shannon", MARGIN = 1, base = exp(1))
-
-
-
-```
-
 # Rarefied species richness, shannon & simpson indexes
 ```{r}
 # MOTU rarefied species richness by sample and primer set
@@ -894,6 +865,10 @@ zeale_rare_simpson <- diversity(zeale_rare_mat[-9,],
 simpson_df <- coleop_rare_simpson %>%
   bind_cols(select(zeale_rare_simpson, -sample))
 
+# set font size for all plot annotations below
+annfont <- 2
+ytextsize = 10
+xtextsize = 11
 
 # Richness boxplots
 rarefy_stats <- rarefy_df_wide %>%
@@ -918,42 +893,44 @@ exp(rarefy_stats)
 rarefy_df_wide %>%
   select(-ends_with("_se")) %>%
   tidyr::pivot_longer(cols = ends_with("_S")) %>%
-  mutate(name = case_when(name == "coleop_S" ~ "Coleop primer",
-                          name == "zeale_S" ~ "Zeale primer")) %>%
+  mutate(name = case_when(name == "coleop_S" ~ "Coleop",
+                          name == "zeale_S" ~ "Zeale")) %>%
   ggplot(aes(x = name, y = value)) +
   geom_line(size = .5, alpha = .5, 
             aes(group = sample), 
             color = "darkgray") +
   geom_violin(draw_quantiles = .5, aes(fill = name),
               alpha = 0.6) +
-  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = c("firebrick", "steelblue")) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
+  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
+  scale_color_manual(values = wes_palette("Cavalcanti1")) +
   theme_bw() +
-  theme(text = element_text(size = 14)) +
+  theme(text = element_text(size = 14),
+        axis.title.y = element_text(size = ytextsize),
+        axis.text.x = element_text(size = xtextsize)) +
   labs(x = "",
        y = "Rarefied MOTU richness") +
   guides(fill = "none", color = "none") +
   annotate("text", x = 2.5, y = 160, 
            label = paste0("Means (log-normal)",
            "\nColeop: ",
-           round(exp(rarefy_stats$mean_lc),2), 
+           round(exp(rarefy_stats$mean_lc),1), 
            ", 95% CI = [",
-           round(exp(rarefy_stats$lcl_lc),2),
+           round(exp(rarefy_stats$lcl_lc),1),
            ", ",
-           round(exp(rarefy_stats$ucl_lc),2), 
+           round(exp(rarefy_stats$ucl_lc),1), 
            "]\n",
            "Zeale: ",
-           round(exp(rarefy_stats$mean_lz),2),
+           round(exp(rarefy_stats$mean_lz),1),
            ", 95% CI = [",
-           round(exp(rarefy_stats$lcl_lz),2),
+           round(exp(rarefy_stats$lcl_lz),1),
            ", ",
-           round(exp(rarefy_stats$ucl_lz),2),
+           round(exp(rarefy_stats$ucl_lz),1),
            "]"),
            hjust = 1,
+           size = annfont,
            color = "darkgray")
 )
   
-
 # Evenness boxplots
 simpson_stats <- simpson_df %>%
   mutate(lc = coleop_simpson,
@@ -973,21 +950,23 @@ simpson_stats <- simpson_df %>%
 
 simpson_stats
 
-(simspon.plot <- 
+(simpson.plot <- 
 simpson_df %>%
   tidyr::pivot_longer(cols = ends_with("_simpson")) %>%
-  mutate(name = case_when(name == "coleop_simpson" ~ "Coleop primer",
-                          name == "zeale_simpson" ~ "Zeale primer")) %>%
+  mutate(name = case_when(name == "coleop_simpson" ~ "Coleop",
+                          name == "zeale_simpson" ~ "Zeale")) %>%
   ggplot(aes(x = name, y = value)) +
   geom_line(size = .5, alpha = .5, 
             aes(group = sample), 
             color = "darkgray") +
   geom_violin(draw_quantiles = .5, aes(fill = name),
               alpha = 0.6) +
-  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = c("firebrick", "steelblue")) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
+  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
+  scale_color_manual(values = wes_palette("Cavalcanti1")) +
   theme_bw() +
-  theme(text = element_text(size = 14)) +
+  theme(text = element_text(size = 14),
+        axis.title.y = element_text(size = ytextsize),
+        axis.text.x = element_text(size = xtextsize)) +
   labs(x = "",
        y = "MOTU evenness (Simpson)") +
   guides(fill = "none", color = "none") +
@@ -1009,6 +988,7 @@ simpson_df %>%
            "]"),
            hjust = 1,
            vjust = 1,
+           size = annfont,
            color = "darkgray")
 )
   
@@ -1034,18 +1014,20 @@ shannon_stats
 (shannon.plot <- 
 shannon_df %>%
   tidyr::pivot_longer(cols = ends_with("_shannon")) %>%
-  mutate(name = case_when(name == "coleop_shannon" ~ "Coleop primer",
-                          name == "zeale_shannon" ~ "Zeale primer")) %>%
+  mutate(name = case_when(name == "coleop_shannon" ~ "Coleop",
+                          name == "zeale_shannon" ~ "Zeale")) %>%
   ggplot(aes(x = name, y = value)) +
   geom_line(size = .5, alpha = .5, 
             aes(group = sample), 
             color = "darkgray") +
   geom_violin(draw_quantiles = .5, aes(fill = name),
               alpha = 0.6) +
-  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = c("firebrick", "steelblue")) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
+  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
+  scale_color_manual(values = wes_palette("Cavalcanti1")) +
   theme_bw() +
-  theme(text = element_text(size = 14)) +
+  theme(text = element_text(size = 14),
+        axis.title.y = element_text(size = ytextsize),
+        axis.text.x = element_text(size = xtextsize)) +
   labs(x = "",
        y = "MOTU diversity (Shannon)") +
   guides(fill = "none", color = "none") +
@@ -1067,12 +1049,13 @@ shannon_df %>%
            "]"),
            hjust = 1,
            vjust = 1,
+           size = annfont,
            color = "darkgray")
 )
-  
-```
-# Plotting relative read abundance by order
-```{r}
+
+#################
+#### Plotting relative read abundance by order
+#################
 
 # set up plotting order df
 order_df <- data.frame(cat = unique(paste0(art_full$class, "-", 
@@ -1121,7 +1104,9 @@ primer_who <- art_full %>%
                                       art_full$order)),
                          primer = c("coleop", "zeale"))) %>%
   # this part converts the NAs in the previous step to 0's
-  mutate(rel.reads = tidyr::replace_na(rel.reads, 0)) %>%
+  mutate(rel.reads = tidyr::replace_na(rel.reads, 0),
+         primer = case_when(primer == "coleop" ~ "Coleop",
+                            primer == "zeale" ~ "Zeale")) %>%
   group_by(cat) %>%
   mutate(mean_rel.reads = mean(rel.reads)) %>%
   ungroup() %>%
@@ -1131,32 +1116,35 @@ primer_who <- art_full %>%
 (who_plot <- 
 primer_who %>%
   ggplot() +
-  geom_col(aes(y = name, x = rel.reads,
+  geom_col(aes(y = name, x = sqrt(rel.reads),
                fill = primer),
            position = position_dodge(),
            alpha = 0.6) +
-  scale_fill_manual(values = c("firebrick", "steelblue")) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
+  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
+  scale_color_manual(values = wes_palette("Cavalcanti1")) +
+  scale_x_continuous(breaks = c(0,2,4,6),
+                     labels = c(0,4,16,36)) +
   theme_bw() +
   theme(text = element_text(size = 14),
-        axis.text.y = element_text(size = 12)) +
+        axis.text.y = element_text(size = 10),
+        legend.position = c(.7,.1)) +
   labs(x = "% of total reads",
-       y = "") +
-  geom_text(aes(y = name, x = rel.reads + 1.5, 
-                color = primer, 
-                label = round(rel.reads,2)),
-            position = position_dodge(width = 1),
-            size = 1.5,
-            data = filter(primer_who, rel.reads < 1))
+       y = "",
+       fill = "")# +
+  # geom_text(aes(y = name, x = rel.reads + 1.5, 
+  #               color = primer, 
+  #               label = round(rel.reads,2)),
+  #           position = position_dodge(width = 1),
+  #           size = 1.5,
+  #           data = filter(primer_who, rel.reads < 1))
 )
 
-```
-
 # Stitch together primer plots
-```{r}
 library(patchwork) 
 
-shannon.plot
+patchobj <- who_plot | (rareS.plot / simpson.plot / shannon.plot)
+
+ggsave("figures/primer_compare6.png", width = 7, height = 7, dpi = 400)
 
 ```
 
