@@ -12,6 +12,9 @@ library(taxa)
 library(vegan)
 library(BiodiversityR)
 library(wesanderson)
+library(patchwork)
+library(tidyr)
+library(forcats)
 select <- dplyr::select
 # path for taxonomy and ecology lookup tables
 tax_data_path <- "data/arthropod.families_20220816.xlsx"
@@ -33,7 +36,17 @@ famlookup <- read_xlsx(tax_data_path,
     # terrestrial/aquatic info from Horren et al. database & others
 lifemode <- read_xlsx(tax_data_path, 
                       sheet = "arthropod.families.lifemode") %>%
-  select(-person)
+  select(-person) %>%
+  mutate(life.cat = case_when(larva_aquatic >= 1 & 
+                                 adult_aquatic >= 1 ~ 
+                                 "Fully aquatic",
+                               larva_terrestrial >= 1 &
+                                 adult_terrestrial >= 1 ~ 
+                                 "Fully terrestrial",
+                               larva_aquatic >= 1 &
+                                 adult_terrestrial >= 1 ~
+                                 "All larvae aquatic",
+                               TRUE ~ "Some larvae aquatic"))
 
 # read in family trait info (diet/feeding)
     # note: class and order added with taxize package using script:
@@ -73,6 +86,37 @@ diet <- read_xlsx(tax_data_path,
                                            "zoophagous-parasitoid",
                                            "zoophagous-micropredator") ~
                              "zoophagous-parasite/parasitoid",
+                              TRUE ~ diet.cat),
+         diet.cat2 = case_when(diet.cat == 
+                                "detritophagous/scavenger" ~ 
+                                "Scavenger",
+                              diet.cat == 
+                                "phytophagous-galls/miners" ~
+                                "Phytophagous",
+                              diet.cat == 
+                                "phytophagous-multiple/other" ~
+                                "Phytophagous",
+                              diet.cat == 
+                                "phytophagous-phyllophagous" ~
+                                "Phytophagous",
+                              diet.cat == 
+                                "phytophagous-sap sucking" ~
+                                "Phytophagous",
+                              diet.cat == 
+                                "phytophagous-saproxylic" ~
+                                "Phytophagous",
+                              diet.cat == 
+                                "zoophagous-parasite/parasitoid" ~
+                                "Parasite/parasitoid",
+                              diet.cat == 
+                                "zoophagous-predator" ~
+                                "Predator",
+                              diet.cat == 
+                                "multiple categories" ~
+                                "Mulitple categories",
+                              diet.cat == 
+                                "mycetophagous" ~
+                                "Mycetophagous",
                               TRUE ~ diet.cat))
 
 table(diet$diet.cat)
@@ -86,7 +130,20 @@ table(diet$diet.cat)
 size <- read_xlsx(tax_data_path, 
                       sheet = "arthropod.families.size") %>%
   select(-person) %>%
-  select(family:final_source)
+  select(family:final_source) %>%
+  mutate(Body_Size = case_when(final_mid > 20 ~ ">20 mm",
+                               final_mid > 10 & 
+                                 final_mid <= 20 ~ "10-20 mm",
+                               final_mid > 5 &
+                                 final_mid <= 10 ~ "5-10 mm",
+                               final_mid <= 5 ~ "<5 mm",
+                               TRUE ~ "Unknown"),
+         Body_Size_order = case_when(Body_Size == "<5 mm" ~ 5,
+                           Body_Size == "5-10 mm" ~ 4,
+                           Body_Size == "10-20 mm" ~ 3,
+                           Body_Size == ">20 mm" ~ 2,
+                           Body_Size == "Unknown" ~ 1)
+  )
 
 # read in OTU data for coleop primer set and add higher taxonomy
 coleop <- read_xlsx("data/coleop.9.final.meta.xlsx", 
@@ -500,7 +557,6 @@ dl_sum_water <- dl_sum %>% filter(Method == "Water")
 ```
 # NMDS Spray vs Roller, conifer vs. deciduous 
 ```{r}
-
 # format data matrix
 mds_data <- rbind(t(pa_fam_r),
                   t(pa_fam_s))
@@ -565,27 +621,22 @@ ggsave("figures/PlotF_NMDS_by_method_and_tree_type2.jpg",
 
 # Test for differences among Method and Tree type
 # PERMANOVA
+set.seed(12555)
 perm_arth <- adonis(mds_data_nb ~ method + tree, data = env.data, 
-       permutations = 999, method = "jaccard",
+       permutations = 9999, method = "jaccard",
        strata = NULL, contr.unordered = "contr.sum",
        contr.ordered = "contr.poly")
 
 perm_arth
-
-# ANOSIM
-method_anosim <- anosim(mds_data_nb, grouping = env.data$method)
-summary(method_anosim) # p 0.001
-
-tree_anosim <- anosim(mds_data_nb, grouping = env.data$tree)
-summary(tree_anosim) # p ~ 0.1
 ```
-# Feeding guild
+# Feeding guild - fine scale
 ```{r}
 feed_step1 <- diet %>%
   select(family, diet.cat) %>%
   left_join(lineage_lookup) %>%
   right_join(n_otus_max) %>%
   group_by(diet.cat) %>%
+  # counts number of families with > 0 reads in each sample
   summarize(across(starts_with("sample"), 
                    .fns = function(x) sum(x > 0)),
             .groups = "drop")
@@ -600,44 +651,77 @@ feed <- feed_step1 %>%
          method = str_sub(sample_id, -1,-1),
          tree = str_sub(sample_id, -2,-2)) %>%
   group_by(method, tree) %>%
+  # calculates mean number of families in samples of each group
   summarize(across(contains("V"), mean),
             .groups = "drop")
 colnames(feed) <- c("method", "tree", feedcats)
 rm(feed_step1, feedcats)
 
 feed_df <- feed %>% 
-  tidyr::pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
+  pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
   mutate(diet.cat = case_when(name == 
                                 "detritophagous/scavenger" ~ 
-                                "scavenger",
+                                "Scavenger",
                               name == 
                                 "phytophagous-galls/miners" ~
-                                "phytophagous",
+                                "Phytophagous",
                               name == 
                                 "phytophagous-multiple/other" ~
-                                "phytophagous",
+                                "Phytophagous",
                               name == 
                                 "phytophagous-phyllophagous" ~
-                                "phytophagous",
+                                "Phytophagous",
                               name == 
                                 "phytophagous-sap sucking" ~
-                                "phytophagous",
+                                "Phytophagous",
                               name == 
                                 "phytophagous-saproxylic" ~
-                                "phytophagous",
+                                "Phytophagous",
                               name == 
                                 "zoophagous-parasite/parasitoid" ~
-                                "parasite/parasitoid",
+                                "Parasite/parasitoid",
                               name == 
                                 "zoophagous-predator" ~
-                                "predator",
+                                "Predator",
+                              name == 
+                                "multiple categories" ~
+                                "Mulitple categories",
+                              name == 
+                                "mycetophagous" ~
+                                "Mycetophagous",
                               TRUE ~ name),
          tree = case_when(tree == "C" ~ "Coniferous",
                           tree == "D" ~ "Deciduous"),
          method = case_when(method == "R" ~ "Roller",
-                          method == "S" ~ "Spray"))
+                          method == "S" ~ "Spray"),
+         order = case_when(diet.cat == "Predator" ~ 1,
+                           diet.cat == "Parasite/parasitoid" ~ 2,
+                           diet.cat == "Phytophagous" ~ 3,
+                           diet.cat == "Scavenger" ~ 4,
+                           diet.cat == "Mycetophagous" ~ 5,
+                           diet.cat == "Multiple categories" ~ 6),
+         diet.cat = fct_reorder(diet.cat, order)
+         )
   
 (feed_plot <- 
+  ggplot(data = feed_df, 
+       aes(x = method, y = value, fill = name)) +
+  theme_bw() +
+  viridis::scale_fill_viridis(discrete=TRUE) +
+  geom_bar(stat="identity", position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  facet_wrap(~tree) +
+  labs(y = "% of families", x = "", 
+       fill = "") +
+  ggtitle("Feeding Guild") +
+  theme(axis.text.x = element_text(size = 15),
+        strip.background = element_rect(fill = "white"))
+)
+
+# ggsave("figures/PlotG_feeding_guild_condensed.jpg", 
+#        width = 6, height = 4, dpi = 400)
+
+(feed_plot_condensed <- 
   ggplot(data = feed_df, 
        aes(x = method, y = value, fill = diet.cat)) +
   theme_bw() +
@@ -652,70 +736,49 @@ feed_df <- feed %>%
         strip.background = element_rect(fill = "white"))
 )
 
-ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
-       width = 6, height = 4, dpi = 400)
-```
+# ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
+#        width = 6, height = 4, dpi = 400)
+
 # Habitat / life mode
-```{r}
-lifemode %>%
-  select(family, diet.cat) %>%
+life_step1 <- lifemode %>%
+  select(family, life.cat) %>%
   left_join(lineage_lookup) %>%
   right_join(n_otus_max) %>%
-  group_by(diet.cat) %>%
+  group_by(life.cat) %>%
   summarize(across(starts_with("sample"), 
                    .fns = function(x) sum(x > 0)),
             .groups = "drop")
 
-feedcats <- feed_step1$diet.cat
-feed <- feed_step1 %>%
+lifecats <- life_step1$life.cat
+life <- life_step1 %>%
   select(starts_with("sample")) %>%
   as.matrix() %>%
   t() %>%
   as.data.frame() %>%
-  mutate(sample_id = colnames(feed_step1)[2:41],
+  mutate(sample_id = colnames(life_step1)[2:41],
          method = str_sub(sample_id, -1,-1),
          tree = str_sub(sample_id, -2,-2)) %>%
   group_by(method, tree) %>%
   summarize(across(contains("V"), mean),
             .groups = "drop")
-colnames(feed) <- c("method", "tree", feedcats)
-rm(feed_step1, feedcats)
+colnames(life) <- c("method", "tree", lifecats)
+rm(life_step1, lifecats)
 
-feed_df <- feed %>% 
-  tidyr::pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
-  mutate(diet.cat = case_when(name == 
-                                "detritophagous/scavenger" ~ 
-                                "scavenger",
-                              name == 
-                                "phytophagous-galls/miners" ~
-                                "phytophagous",
-                              name == 
-                                "phytophagous-multiple/other" ~
-                                "phytophagous",
-                              name == 
-                                "phytophagous-phyllophagous" ~
-                                "phytophagous",
-                              name == 
-                                "phytophagous-sap sucking" ~
-                                "phytophagous",
-                              name == 
-                                "phytophagous-saproxylic" ~
-                                "phytophagous",
-                              name == 
-                                "zoophagous-parasite/parasitoid" ~
-                                "parasite/parasitoid",
-                              name == 
-                                "zoophagous-predator" ~
-                                "predator",
-                              TRUE ~ name),
-         tree = case_when(tree == "C" ~ "Coniferous",
+life_df <- life %>% 
+  pivot_longer(., cols = starts_with("All"):starts_with("Some")) %>%
+  mutate(tree = case_when(tree == "C" ~ "Coniferous",
                           tree == "D" ~ "Deciduous"),
          method = case_when(method == "R" ~ "Roller",
-                          method == "S" ~ "Spray"))
+                          method == "S" ~ "Spray"),
+         order = case_when(name == "Fully aquatic" ~ 4,
+                           name == "Fully terrestrial" ~ 1,
+                           name == "All larvae aquatic" ~ 3,
+                           name == "Some larvae aquatic" ~ 2),
+         name = fct_reorder(name, order, .desc = F))
   
-(feed_plot <- 
-  ggplot(data = feed_df, 
-       aes(x = method, y = value, fill = diet.cat)) +
+(life_plot <- 
+  ggplot(data = life_df, 
+       aes(x = method, y = value, fill = name)) +
   theme_bw() +
   viridis::scale_fill_viridis(discrete=TRUE) +
   geom_bar(stat="identity", position = "fill") +
@@ -723,56 +786,319 @@ feed_df <- feed %>%
   facet_wrap(~tree) +
   labs(y = "% of families", x = "", 
        fill = "") +
-  ggtitle("Feeding Guild") +
+  ggtitle("Life mode") +
   theme(axis.text.x = element_text(size = 15),
         strip.background = element_rect(fill = "white"))
 )
-ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
-       width = 6, height = 4, dpi = 400)
-```
 
-# Habitat
-```{r}
-(hab <- dl %>%
-  mutate(Habitat = fct_reorder(Habitat, desc(Habitat_order))) %>%
-ggplot(aes(x = Method, y = total, fill = Habitat)) +
+# ggsave("figures/PlotI_life_mode.jpg",
+#        width = 6, height = 4, dpi = 400)
+
+# Body size
+size_step1 <- size %>%
+  select(family, size.cat = Body_Size, order = Body_Size_order) %>%
+  left_join(lineage_lookup) %>%
+  right_join(n_otus_max) %>%
+  group_by(size.cat) %>%
+  summarize(across(starts_with("sample"), 
+                   .fns = function(x) sum(x > 0)),
+            .groups = "drop")
+
+sizecats <- size_step1$size.cat
+size_step2 <- size_step1 %>%
+  select(starts_with("sample")) %>%
+  as.matrix() %>%
+  t() %>%
+  as.data.frame() %>%
+  mutate(sample_id = colnames(size_step1)[2:41],
+         method = str_sub(sample_id, -1,-1),
+         tree = str_sub(sample_id, -2,-2)) %>%
+  group_by(method, tree) %>%
+  summarize(across(contains("V"), mean),
+            .groups = "drop")
+colnames(size_step2) <- c("method", "tree", sizecats)
+rm(size_step1, sizecats)
+
+size_df <- size_step2 %>% 
+  pivot_longer(., cols = 3:6) %>%
+  mutate(tree = case_when(tree == "C" ~ "Coniferous",
+                          tree == "D" ~ "Deciduous"),
+         method = case_when(method == "R" ~ "Roller",
+                          method == "S" ~ "Spray")) %>%
+  left_join(distinct(select(size, name = Body_Size, 
+                            order = Body_Size_order))) %>%
+  mutate(name = fct_reorder(name, order, .desc = F))
+  
+(size_plot <- 
+  ggplot(data = size_df, 
+       aes(x = method, y = value, fill = name)) +
   theme_bw() +
   viridis::scale_fill_viridis(discrete=TRUE) +
   geom_bar(stat="identity", position = "fill") +
   scale_y_continuous(labels = scales::percent) +
-  ylab ("Proportion of OTUs") + 
-  xlab("") +
-  ggtitle("Habitat") +
-  theme(axis.text.x = element_text(size = 15)))
-# ggsave("figures/habitat_no_aquatic.jpg", width = 6, height = 6, dpi = 400)
+  facet_wrap(~tree) +
+  labs(y = "% of families", x = "", 
+       fill = "") +
+  ggtitle("Body size") +
+  theme(axis.text.x = element_text(size = 15),
+        strip.background = element_rect(fill = "white"))
+)
+
+# ggsave("figures/PlotJ_body_size.jpg", 
+#        width = 6, height = 4, dpi = 400)
+
+#################
+##### combine feeding guild, life mode, and body size plots
+#################
+
+feed_plot_condensed / life_plot / size_plot
+
+ggsave("figures/PlotK_body_size.jpg", 
+       width = 6, height = 12, dpi = 400)
+
 ```
-# Body Size
+# multinomial models for feed data
+https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
+https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
 ```{r}
-(size <- dl %>%
-  mutate(Body_Size = fct_reorder(Body_Size, desc(Body_Size_order))) %>%
-  ggplot(aes(x = Method, y = total, fill = Body_Size)) +
+n_otus_pa <- n_otus_max[,-1]
+n_otus_pa[n_otus_pa > 0] <- 1
+n_otus_pa <- cbind(n_otus_max[,1], n_otus_pa)
+
+feed_freq <- n_otus_pa %>%
+  left_join(lineage_lookup) %>%
+  left_join(select(diet, family, diet.cat2)) %>%
+  select(-family, -lineage)
+
+feed_freq_sum1 <- aggregate(feed_freq[,1:40], 
+                           by = list(feed_freq$diet.cat2), sum)
+
+feed_freq_sum2 <- feed_freq_sum1 %>%
+  select(2:41) %>%
+  t()
+colnames(feed_freq_sum2) <- feed_freq_sum1$Group.1
+
+feed_freq_sum <- feed_freq_sum2 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(feed_freq_sum2),
+         tree = stringr::str_sub(sample, -2,-2),
+         method = stringr::str_sub(sample, -1, -1)) %>%
+  rename(mult = 1, myce = 2, para = 3, phyt = 4, pred = 5, scav = 6) %>%
+  select(-sample)
+
+library(brms)
+
+dat <- feed_freq_sum
+dat$a1 <- 1
+dat$size <- with(dat, mult + myce + para + phyt + pred + scav)
+dat$y <- with(dat, cbind(mult, myce, para, phyt, pred, scav))
+
+# model with both method and tree type
+set.seed(102)
+fit.method.tree <- brm(bf(y | trials(size) ~ method + tree), 
+            data = dat, family = multinomial(refcat = "mult"),
+            save_pars = save_pars(all = TRUE))
+
+# model with only method
+set.seed(102)
+fit.method <- brm(bf(y | trials(size) ~ method), 
+            data = dat, family = multinomial(refcat = "mult"),
+            save_pars = save_pars(all = TRUE))
+
+# model with only tree type
+set.seed(102)
+fit.tree <- brm(bf(y | trials(size) ~ tree), 
+            data = dat, family = multinomial(refcat = "mult"),
+            save_pars = save_pars(all = TRUE))
+
+# adding LOOIC criterion to 3 models
+fit.method.tree <- add_criterion(fit.method.tree, "loo", 
+                                 moment_match = T,
+                          reloo = TRUE)
+fit.method <- add_criterion(fit.method, "loo", 
+                                 moment_match = T,
+                          reloo = TRUE)
+fit.tree <- add_criterion(fit.tree, "loo", 
+                                 moment_match = T,
+                          reloo = TRUE)
+
+# save model output so we don't have to refit each time
+saveRDS(fit.method.tree, "output/feed_multinomial_method.tree.rds")
+saveRDS(fit.method, "output/feed_multinomial_method.rds")
+saveRDS(fit.tree, "output/feed_multinomial_tree.rds")
+
+# load the models so we don't have to refit them each time
+fit.method.tree <- saveRDS("output/feed_multinomial_method.tree.rds")
+fit.method <- saveRDS("output/feed_multinomial_method.rds")
+fit.tree <- saveRDS("output/feed_multinomial_tree.rds")
+
+# evaluating models based on LOOIC
+loo_compare(fit.method.tree, fit.method, fit.tree, 
+            criterion = "loo") %>% 
+  print(simplify = F)
+
+# plot top model predictions
+fit.newdata = expand.grid(method = c("S", "R"),
+                                 size = 1)
+
+fitsies <- fitted(fit.method, 
+                  newdata = fit.newdata,probs = c(0.025, 0.1,
+                                                  0.9, 0.975))
+
+fitsies
+
+fitsies.list <- list()
+for(i in 1:dim(fitsies)[3]){
+  fitsies.list[[i]] <- fitsies[,,i]
+}
+
+fits_df <- do.call(rbind, fitsies.list) %>%
+  as.data.frame() %>%
+  mutate(method = rep(fit.newdata$method, 6),
+         feed = c(rep("Mulitple categories", 2),
+                  rep("Mycetophagous", 2),
+                  rep("Parasite/Parasitoid", 2),
+                  rep("Phytophagous", 2),
+                  rep("Predator", 2),
+                  rep("Scavenger", 2))) %>%
+  group_by(feed) %>%
+  mutate(mean_p = mean(Estimate)) %>%
+  ungroup() %>%
+  mutate(feed = fct_reorder(feed, mean_p),
+         method = case_when(method == "S" ~ "Spray",
+                            method == "R" ~ "Roller"))
+         
+(feed_plot2 <- 
+fits_df %>%
+  ggplot() +
+  geom_point(aes(y = feed, x = 100*Estimate, color = method, 
+                 group = method),
+             position = position_dodge(width = .75),
+             size = 3) +
+  geom_errorbar(aes(y = feed, xmin = 100*Q10, 
+                    xmax = 100*Q90, color = method,
+                    group = method),
+                size = 1,
+                position = position_dodge(width = .75),
+                width = 0) +
+  geom_errorbar(aes(y = feed, xmin = 100*Q2.5, 
+                    xmax = 100*Q97.5, color = method,
+                    group = method),
+                position = position_dodge(width = .75),
+                width = 0) +
+  scale_color_manual(values = 
+                       wesanderson::wes_palette("Moonrise2")) +
+  labs(color = "",
+       y = "",
+       x = "% of families",
+       title = "Feeding guild") +
   theme_bw() +
-  viridis::scale_fill_viridis(discrete=TRUE) +
-  geom_bar(stat="identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent) +
-  ylab ("Proportion of OTUs") + 
-  labs(fill = "Body Size") +
-  xlab("") +
-  ggtitle("Body Size") +
-  theme(axis.text.x = element_text(size = 15)))
-# ggsave("figures/body_size_no_aquatic.jpg", width = 6, height = 6, dpi = 400)
+  theme(text = element_text(size = 13),
+        legend.position = c(.8,.2))
+)
 
-require(gridExtra)
-grid.arrange(feed, size, hab, ncol=3)
+```
+# multinomial test in brms
+https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
+https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
+```{r}
+library(brms)
+N <- 15
+xcat = sample(c("hi", "bye"), N, replace = T)
+dat <- data.frame(
+    y1 = rbinom(N, 10, 0.3), 
+    y2 = rbinom(N, 10, 0.5), 
+    y3 = rbinom(N, 10, 0.7), 
+    x = rnorm(N),
+    xcat = xcat
+)
 
-# ggsave("figures/whos_there_no_aquatic.jpg", arrangeGrob(feed, size, hab), width= 7, height = 7, dpi = 500)
+dat$size <- with(dat, y1 + y2 + y3)
+dat$y <- with(dat, cbind(y1, y2, y3))
+
+prior <- prior(normal(0, 10), "b", dpar = muy2) +
+    prior(cauchy(0, 1), "Intercept") +
+    prior(normal(0, 2), "Intercept", dpar = muy3)
+fit <- brm(bf(y | trials(size)  ~ xcat, muy2 ~ x), data = dat, 
+                family = multinomial(), prior = prior)
+```
+
+# multinomial test in jags
+https://stackoverflow.com/questions/63444427/bayesian-multinomial-regression-using-rjags-package
+```{r}
+library(rjags)
+#Data
+set.seed(1)
+data <- data.frame(Age = round(runif(119, min = 1, max = 18)),
+                   Group = c(rep("pink", 20), rep("blue", 18), rep("yellow", 81)), 
+                   Outcome = c(rep("A", 45), rep("B", 19), rep("C", 55)))
+
+#Input Values we will avoid pink because it is used as reference level
+#so constant absorbs the effect of that level
+r1 <- as.numeric(data$Group=='pink')
+r2 <- as.numeric(data$Group=='blue')
+r3 <- as.numeric(data$Group=='yellow')
+age <- data$Age
+#Output 2 and 3
+o1 <- as.numeric(data$Outcome=='A')
+o2 <- as.numeric(data$Outcome=='B')
+o3 <- as.numeric(data$Outcome=='C')
+#Dim, all have the same length
+N <- length(r2)
+
+## Step 1: Specify model
+
+model.string <- "
+model{
+for (i in 1:N){ 
+
+## outcome levels B, C
+o1[i] ~ dbern(pi1[i])
+o2[i] ~ dbern(pi2[i]) 
+o3[i] ~ dbern(pi3[i]) 
+
+## predictors
+logit(pi1[i]) <- b1+b2*age[i]+b3*r2[i]+b4*r3[i]
+logit(pi2[i]) <- b1+b2*age[i]+b3*r2[i]+b4*r3[i]
+logit(pi3[i]) <- b1+b2*age[i]+b3*r2[i]+b4*r3[i]
+
+} 
+## priors
+b1 ~ dnorm(0, 0.001)
+b2 ~ dnorm(0, 0.001)
+b3 ~ dnorm(0, 0.001)
+b4 ~ dnorm(0, 0.001)
+}
+"
+#Model
+model.spec<-textConnection(model.string)
+
+## fit model w JAGS
+jags <- jags.model(model.spec,
+                   data = list('r2'=r2,'r3'=r3,
+                               'o1'=o1,'o2'=o2,'o3'=o3,
+                               'age'=age,'N'=N),
+                   n.chains=3,
+                   n.adapt=3000)
+
+#Update the model
+#Update
+update(jags, n.iter=1000,progress.bar = 'none')
+#Sampling
+results <- coda.samples(jags,variable.names=c("b1","b2","b3","b4"),n.iter=1000,
+                        progress.bar = 'none')
+#Results
+Res <- do.call(rbind.data.frame, results)
+
+#Posterior means
+apply(Res,2,mean)
+apply(Res,2,quantile,prob=0.05)
+apply(Res,2,quantile,prob=0.95)
 ```
 
 
 
-
-
-# Rarefied species richness, shannon & simpson indexes
+# Plots of rarefied species richness, shannon & simpson indexes, relative read frequency by primer
 ```{r}
 # MOTU rarefied species richness by sample and primer set
 names(art_order) # to get column numbers of matrix
