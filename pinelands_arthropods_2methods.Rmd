@@ -591,6 +591,8 @@ sites.long1 <-
 head(sites.long1)
 str(sites.long1)
 
+(
+plotf <- 
 ggplot(sites.long1) +
   geom_vline(xintercept = c(0),
              color = "grey70",
@@ -614,6 +616,7 @@ ggplot(sites.long1) +
        color = "Method", shape = "Tree type") +
   theme_bw() +
   theme(text = element_text(size = 14))
+)
 
 ggsave("figures/PlotF_NMDS_by_method_and_tree_type2.jpg",
        dpi = 600, width = 6, height = 6)
