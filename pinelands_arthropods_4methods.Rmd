@@ -3,9 +3,34 @@ Initial field effort testing 4 methods with n = 2-6 samples each.
 
 # Load libraries. Read, clean and format data
 ```{r}
-library(tidyverse)
+library(dplyr)
 library(metacoder)
+library(readxl)
+library(ggplot2)
+library(stringr)
+library(taxa)
+library(vegan)
+library(BiodiversityR)
+library(wesanderson)
+library(patchwork)
+library(tidyr)
+library(forcats)
 select <- dplyr::select
+# path for taxonomy and ecology lookup tables
+tax_data_path <- "data/arthropod.families_20220831.xlsx"
+# note: the 20220816 version is up-to-date for 2methods
+#   but hadn't received new families from 4methods yet
+
+# read in family name look up 
+    # will use to match each OTU with an NCBI family name
+    # created by looking up each entry in NCBI if it didn't 
+      # have a family name yet from bioinformatics work
+famlookup <- read_xlsx(tax_data_path, 
+                       sheet = "arthropod.families") %>%
+  select(final_lowest, 
+         final_ID = 'final species_name',
+         family:kingdom) %>%
+  distinct()
 
 d_otus <- read.csv("data/ITS_CO1datacombined.csv") %>%
   filter(fam != "",

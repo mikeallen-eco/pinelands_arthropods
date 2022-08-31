@@ -18,6 +18,8 @@ library(forcats)
 select <- dplyr::select
 # path for taxonomy and ecology lookup tables
 tax_data_path <- "data/arthropod.families_20220816.xlsx"
+# note: the 20220816 version is up-to-date for 2methods
+#   but hadn't received new families from 4methods yet
 
 # read in family name look up 
     # will use to match each OTU with an NCBI family name

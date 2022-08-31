@@ -87,8 +87,9 @@ write.csv(orders2, "data/arthropod.families.traits.csv",
 
 #### adding higher taxa
 library(taxize)
+library(dplyr)
 # add orders to the lowest taxa rank based on NCBI database
-full_taxa_lookup <- tax_name(sci = unique(famlookup$final_family), 
+full_taxa_lookup <- taxize::tax_name(sci = unique(famlookup$final_lowest), 
                    get = c("family", "order", "class", 
                            "phylum", "kingdom"), 
                    db = "ncbi")
@@ -97,7 +98,7 @@ full_taxa_lookup <- tax_name(sci = unique(famlookup$final_family),
 # make new columns for the "arthropod.families" database
 
 # path for taxonomy and ecology lookup tables
-tax_data_path <- "data/arthropod.families_20220816.xlsx"
+tax_data_path <- "data/arthropod.families_20220831.xlsx"
 
 # read in family name look up 
 # will use to match each OTU with an NCBI family name
@@ -109,6 +110,6 @@ full_taxa_lookup2 <- read_xlsx(tax_data_path,
   left_join(rename(full_taxa_lookup, final_lowest = query)) %>%
   select(-db)
 
-write.csv(full_taxa_lookup2, "data/arthropod.higher.taxa.lookup.csv",
+write.csv(full_taxa_lookup2, "data/arthropod.higher.taxa.lookup3.csv",
           row.names = F)
 
