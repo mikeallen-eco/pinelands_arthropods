@@ -456,41 +456,35 @@ save_kable(tables1,
 rm(art_spray, art_water, art_roll, art_soil, tab, tables1)
 
 ```
-# Format data for the heat trees
+# Format data for heat trees
 ```{r}
-
+library(taxa)
 obj <- parse_tax_data(n_otus_max,
                       class_cols = "lineage", 
                       class_sep = ";", 
                       class_regex = "^(.+)__(.+)$", # Regex 
-                      class_key = c(tax_rank = "info", 
-                                    # key describing each regex group
+                      class_key = c(tax_rank = "info", # key describing each regex group
                                     tax_name = "taxon_name"))
 
-# relativizing data
-obj$data$tax_data_p <- calc_obs_props(obj, "tax_data")
+# convert to proportions
+# obj$data$tax_data <- calc_obs_props(obj, "tax_data")
 
 #Getting per-taxon information
 obj$data$tax_abund <- calc_taxon_abund(obj, "tax_data",
                                        cols = d_samples$sample_id,
                                        groups = d_samples$Method)
 
-#Getting per-taxon information (proportional data)
-obj$data$tax_abund_p <- calc_taxon_abund(obj, "tax_data_p",
-                                       cols = d_samples$sample_id,
-                                       groups = d_samples$Method)
+# change column names
+obj$data$tax_abund$Soil <- obj$data$tax_abund$D
+obj$data$tax_abund$Water <- obj$data$tax_abund$W
+obj$data$tax_abund$Roller <- obj$data$tax_abund$R
+obj$data$tax_abund$Spray <- obj$data$tax_abund$S
 
-# Getting per-taxon information (proportional data)
-obj$data$tax_abund_p2 <- calc_taxon_abund(obj, "tax_data_p",
-                                       cols = d_samples$sample_id)
+obj$data$tax_abund$Soil_per <- obj$data$tax_abund$Soil/5
+obj$data$tax_abund$Roller_per <- obj$data$tax_abund$Roller/3
+obj$data$tax_abund$Spray_per <- obj$data$tax_abund$Spray/3
+obj$data$tax_abund$Water_per <- obj$data$tax_abund$Water/2
 
-# create a variable that indicates which method(s) detected
-makewhich <- obj$data$tax_abund %>%
-  mutate(which = case_when(S > 0 & R > 0 ~ 0,
-                           S > 0 & R == 0 ~ 1,
-                           S == 0 & R > 0 ~ -1))
-
-obj$data$tax_abund <- makewhich
 
 #Getting per-taxon information for 'number of samples'
 obj$data$tax_abund1 <- calc_taxon_abund(obj, "tax_data",
@@ -499,75 +493,130 @@ obj$data$tax_abund1 <- calc_taxon_abund(obj, "tax_data",
 # calculate the number of samples that have reads for each taxon
 obj$data$tax_occ <- calc_n_samples(obj, "tax_abund1", groups = d_samples$Method, cols = d_samples$sample_id)
 
-# calculate the number of samples that have reads for each taxon
-obj$data$tax_occ1 <- calc_n_samples(obj, "tax_abund1", groups = d_samples$Samp, cols = d_samples$sample_id)
+# change column names
+obj$data$tax_occ$Soil <- obj$data$tax_occ$D
+obj$data$tax_occ$Water <- obj$data$tax_occ$W
+obj$data$tax_occ$Spray <- obj$data$tax_occ$S
+obj$data$tax_occ$Roller <- obj$data$tax_occ$R
 
-obj$data$tax_occ$any <- apply(obj$data$tax_occ1[,2:21], 1, function(x) sum(x>0))
 
-obj$data$tax_occ$p_any <- 100*obj$data$tax_occ$any/20
+# calculate the number of methods that detected each taxon
+obj$data$tax_occ$num_methods <- (obj$data$tax_occ$Soil>0) +
+  (obj$data$tax_occ$Roller>0) +
+  (obj$data$tax_occ$Spray>0) +
+  (obj$data$tax_occ$Water>0)
 
-obj$data$diff_table <- compare_groups(obj,
-                                      data = "tax_abund_p",
-                 cols = colnames(obj$data$tax_abund_p)[2:3],
-                  groups = colnames(obj$data$tax_abund_p)[2:3]) 
+# calculate mean number of taxa per sample detected across all methods
+obj$data$tax_abund$All_per <- (obj$data$tax_abund$Soil_per +
+  obj$data$tax_abund$Roller_per + 
+  obj$data$tax_abund$Spray_per +
+  obj$data$tax_abund$Water_per)/4
 
-obj$data$diff_table2 <- compare_groups(obj,
-                                      data = "tax_abund_p2", groups = d_samples$Method, cols = d_samples$sample_id) 
+# calculate mean number of taxa detected across all methods
+obj$data$tax_abund$All <- (obj$data$tax_abund$Soil +
+  obj$data$tax_abund$Roller + 
+  obj$data$tax_abund$Spray +
+  obj$data$tax_abund$Water)/4
 
-# Look at data frames
-obj$data$tax_abund
-obj$data$tax_occ
-obj$data$tax_data
-obj$data$class_data
-```
-# Make heat tree
-```{r}
-set.seed(4) # This makes the plot appear the same each time it is run 
-(sprayroll <- heat_tree(obj, 
-          node_label = taxon_names,
-          node_size = obj$data$tax_occ$p_any,
-          node_color = obj$data$tax_abund$which, 
-          node_color_digits = 0,
-          node_size_digits = 0,
-          node_color_trans = "linear",
-          node_color_interval = c(-1,1),
-          node_size_interval = c(0,100),
-          node_size_axis_label = "% of sites",
-          node_color_axis_label = "",
-          node_color_range = c("steelblue", "#CBC3E3", "firebrick"),
-          layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford" #+ "automatic"
-          ) 
-    # theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
-    # annotate(geom = "text", x = .9, y = .9, label = "Soil", size = 9)
-  )
-
-# ggsave("figures/PlotC_Spray_Roll4_seed4.jpg",
-#    width = 7, height = 7, dpi = 400)
 
 ```
-# Heat tree of log2 ratio of median proportions
+# Make heat trees (4-method)
 ```{r}
-
-dif_tab <- obj$data$diff_table2
-
-set.seed(4)
-heat_tree(obj, 
+# Soil
+set.seed(1) # This makes the plot appear the same each time it is run 
+(soil <- heat_tree(obj, 
           node_label = taxon_names,
-          node_size = obj$data$tax_occ$p_any,
-          node_color = obj$data$diff_table2$log2_median_ratio, 
-          node_color_interval = c(-3, 3), 
-          node_color_range = diverging_palette(), 
+          node_size = obj$data$tax_abund$Soil,
+          node_color = obj$data$tax_occ$Soil, 
           node_color_digits = 2,
-          node_size_digits = 0,
-          node_size_axis_label = "% of sites",
-          node_color_axis_label = "Log 2 ratio of median proportions",
+          node_color_trans = "linear",
+          node_color_interval = c(0,5),
+          node_size_axis_label = "No. MOTUs",
+          node_color_axis_label = "Samples with reads",
           layout = "davidson-harel", # The primary layout algorithm
-          initial_layout = "reingold-tilford") 
+          initial_layout = "reingold-tilford") +
+    theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Soil", size = 9)
+  )
+ # ggsave("figures/Soil_tree_abund2_margin.jpg", 
+        # width = 7, height = 7, dpi = 400)
 
-ggsave("figures/PlotD_Spray_Roll_difference.jpg",
-   width = 7, height = 7, dpi = 400)
+# Roller
+set.seed(1) # This makes the plot appear the same each time it is run 
+(roller <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Roller,
+          node_color = obj$data$tax_occ$Roller,
+          node_color_digits = 2,
+          node_color_trans = "linear",
+          node_color_interval = c(0,3),
+          node_size_axis_label = "No. MOTUs",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") %>%
+  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Roller", size = 9)
+  )
+# ggsave("figures/Roller_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
+
+# Spray
+set.seed(1) # This makes the plot appear the same each time it is run 
+(spray <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Spray,
+          node_color = obj$data$tax_occ$Spray,
+          node_color_digits = 1,
+          node_color_trans = "linear",
+          node_color_interval = c(0,3),
+          node_size_axis_label = "No. MOTUs",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") %>%
+  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Spray", size = 9)
+  )
+# ggsave("figures/Spray_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
+
+# Water
+set.seed(1) # This makes the plot appear the same each time it is run 
+(water <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$Water,
+          node_color = obj$data$tax_occ$Water,
+          node_color_digits = 1,
+          node_color_trans = "linear",
+          node_color_interval = c(0,2),
+          node_size_axis_label = "No. MOTUs",
+          node_color_axis_label = "Samples with reads",
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford") %>%
+  + theme(plot.margin=unit(c(-1,0,-1,0), "cm")) +
+    annotate(geom = "text", x = .9, y = .9, label = "Water", size = 9) 
+)
+# ggsave("figures/Water_tree_abund2_margin.jpg", width = 7, height = 7, dpi = 400)
+
+# 4-panel figure
+g <- gridExtra::grid.arrange(roller, spray, soil, water)
+
+ggsave("figures/FigS3_heat_tree_collage_grid.jpg", g, 
+       height = 9, width = 9, dpi = 400)
 ```
+# Make heat tree showing number of methods that detected each taxa
+```{r}
+set.seed(1) # This makes the plot appear the same each time it is run 
+(methods <- heat_tree(obj, 
+          node_label = taxon_names,
+          node_size = obj$data$tax_abund$All,
+          node_color = obj$data$tax_occ$num_methods, 
+          node_size_axis_label = "Mean no. MOTUs",
+          node_color_axis_label = "No. methods with reads",
+          node_color_range = c("gray", "darkgoldenrod1", "steelblue"),
+          layout = "davidson-harel", # The primary layout algorithm
+          initial_layout = "reingold-tilford")) # The layout algorithm 
+# ggsave("figures/FigS2_number_of_methods_tree.jpg", width = 7, height = 7, dpi = 400)
+```
+
+
 # Species accumulation curves
 used code from here: https://rpubs.com/Roeland-KINDT/694021
 and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
@@ -668,7 +717,7 @@ specpool(both_mat)
 
 # tally up families from primary and pilot study
 ```{r}
-# for now, read in dl from the 4methods Rmd
+# for now, read in dl from the original 4methods Rmd
 old_fam <- unique(dl$fam)
 
 all_fam <- size %>% full_join(data.frame(family = old_fam))
@@ -766,25 +815,25 @@ perm_arth <- adonis(mds_data_nb ~ method + tree, data = env.data,
 
 perm_arth
 ```
-# Feeding guild - fine scale
+# trait data - stacked bars
 ```{r}
 feed_step1 <- diet %>%
-  select(family, diet.cat) %>%
+  select(family, diet.cat2) %>%
   left_join(lineage_lookup) %>%
   right_join(n_otus_max) %>%
-  group_by(diet.cat) %>%
+  group_by(diet.cat2) %>%
   # counts number of families with > 0 reads in each sample
   summarize(across(starts_with("sample"), 
                    .fns = function(x) sum(x > 0)),
             .groups = "drop")
 
-feedcats <- feed_step1$diet.cat
+feedcats <- feed_step1$diet.cat2
 feed <- feed_step1 %>%
   select(starts_with("sample")) %>%
   as.matrix() %>%
   t() %>%
   as.data.frame() %>%
-  mutate(sample_id = colnames(feed_step1)[2:41],
+  mutate(sample_id = colnames(feed_step1)[2:14],
          method = str_sub(sample_id, -1,-1),
          tree = str_sub(sample_id, -2,-2)) %>%
   group_by(method, tree) %>%
@@ -795,39 +844,8 @@ colnames(feed) <- c("method", "tree", feedcats)
 rm(feed_step1, feedcats)
 
 feed_df <- feed %>% 
-  pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
-  mutate(diet.cat = case_when(name == 
-                                "detritophagous/scavenger" ~ 
-                                "Scavenger",
-                              name == 
-                                "phytophagous-galls/miners" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-multiple/other" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-phyllophagous" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-sap sucking" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-saproxylic" ~
-                                "Phytophagous",
-                              name == 
-                                "zoophagous-parasite/parasitoid" ~
-                                "Parasite/parasitoid",
-                              name == 
-                                "zoophagous-predator" ~
-                                "Predator",
-                              name == 
-                                "multiple categories" ~
-                                "Mulitple categories",
-                              name == 
-                                "mycetophagous" ~
-                                "Mycetophagous",
-                              TRUE ~ name),
-         tree = case_when(tree == "C" ~ "Coniferous",
+  pivot_longer(., cols = 3:8) %>%
+  mutate(tree = case_when(tree == "C" ~ "Coniferous",
                           tree == "D" ~ "Deciduous"),
          method = case_when(method == "R" ~ "Roller",
                           method == "S" ~ "Spray"),
@@ -837,7 +855,7 @@ feed_df <- feed %>%
                            diet.cat == "Scavenger" ~ 4,
                            diet.cat == "Mycetophagous" ~ 5,
                            diet.cat == "Multiple categories" ~ 6),
-         diet.cat = fct_reorder(diet.cat, order)
+         diet.cat2 = fct_reorder(diet.cat2, order)
          )
   
 (feed_plot <- 
