@@ -233,10 +233,7 @@ n_otus_primer <- art %>%
                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
   group_by(primer, lineage) %>%
   summarise(across(starts_with("sample"), sum),
-            .groups = "drop") %>%
-  mutate('sample:1DS' = 0,
-         'sample:9DS' = 0,
-         'sample:3DS' = 0)
+            .groups = "drop")
 
 # otu count by family for arthropods (max of 2 primers)
 n_otus_max <- n_otus_primer %>%
@@ -249,9 +246,7 @@ new_col_names <- n_otus_max %>%
   select(starts_with("sample")) %>%
   colnames() %>%
   substr(., 1, 11) %>%
-  gsub(., pattern = ":", replacement = "") %>%
-  gsub(., pattern = "B", replacement = "") %>%
-  gsub(., pattern = "Z", replacement = "")
+  gsub(., pattern = ":", replacement = "")
 
 colnames(n_otus_max) <- c("lineage", new_col_names)
 
@@ -260,43 +255,45 @@ pa_fam <- n_otus_max %>%
   mutate(across(starts_with("sample"),
                 .fns = function(x) ifelse(x > 0,1,0)))
 
-# separate family presenc/absence into spray & roller matrices
+# separate family presence/absence into spray & roller matrices
 pa_fam_s <- pa_fam %>%
-  select(contains("CS"), sample1DS, sample2DS, 
-         sample3DS, contains("DS")[2:6],
-         sample9DS, sample10DS) %>%
+  select(contains("eS")) %>%
   as.matrix()
 
 pa_fam_r <- pa_fam %>%
-  select(contains("CR"), contains("DR")) %>%
+  select(contains("eR")) %>%
   as.matrix()
 
-pa_fam_array <- array(NA, dim = c(177, 20, 2))
-pa_fam_array[,,1] <- pa_fam_s
-pa_fam_array[,,2] <- pa_fam_r
-pa_fam_both <- apply(pa_fam_array, c(1,2), max)
+pa_fam_soil <- pa_fam %>%
+  select(contains("eD")) %>%
+  as.matrix()
+
+pa_fam_w <- pa_fam %>%
+  select(contains("eW")) %>%
+  as.matrix()
+
+# pa_fam_array <- array(NA, dim = c(86, 20, 2))
+# pa_fam_array[,,1] <- pa_fam_s
+# pa_fam_array[,,2] <- pa_fam_r
+# pa_fam_both <- apply(pa_fam_array, c(1,2), max)
 
 # make a data frame of prevalence of each family by method
-pasum <- data.frame(
-  lineage = pa_fam$lineage,
-  spray.pa = apply(pa_fam_s, 1, mean),
-  roll.pa = apply(pa_fam_r, 1, mean),
-  both.pa = apply(pa_fam_both, 1, mean)) %>%
-  arrange(desc(roll.pa)) %>%
-  mutate(roll.rank = 1:length(roll.pa)) %>%
-  arrange(desc(spray.pa)) %>%
-  mutate(spray.rank = 1:length(spray.pa)) %>%
-  mutate(whichdet = case_when(roll.pa > 0 & spray.pa > 0 ~ 0,
-                              roll.pa > 0 & spray.pa == 0 ~ 1,
-                              roll.pa == 0 & spray.pa > 0 ~ -1))
+# pasum <- data.frame(
+#   lineage = pa_fam$lineage,
+#   spray.pa = apply(pa_fam_s, 1, mean),
+#   roll.pa = apply(pa_fam_r, 1, mean),
+#   both.pa = apply(pa_fam_both, 1, mean)) %>%
+#   arrange(desc(roll.pa)) %>%
+#   mutate(roll.rank = 1:length(roll.pa)) %>%
+#   arrange(desc(spray.pa)) %>%
+#   mutate(spray.rank = 1:length(spray.pa)) %>%
+#   mutate(whichdet = case_when(roll.pa > 0 & spray.pa > 0 ~ 0,
+#                               roll.pa > 0 & spray.pa == 0 ~ 1,
+#                               roll.pa == 0 & spray.pa > 0 ~ -1))
 
-d_samples <- data.frame(sample_id = colnames(pa_fam)[2:41]) %>%
-  mutate(Method = stringr::str_sub(sample_id, -1,-1),
-         Tree = stringr::str_sub(sample_id, -2,-2),
+d_samples <- data.frame(sample_id = colnames(pa_fam)[2:14]) %>%
+  mutate(Method = stringr::str_sub(sample_id, -2,-2),
          Samp = sample_id)
-
-str_sub(d_samples$Samp, -1,-1) <- ""
-
 ```
 # Count up families by method and make Venn diagram
 ```{r}
@@ -330,38 +327,29 @@ art_soil <- art %>%
   distinct() # 38 families with soil
 
 # unique families within each method
-art_spray %>%
+(spray_unique <- art_spray %>%
   filter(family %notin% unique(c(art_roll$family, 
                            art_water$family,
-                           art_soil$family))) # 3 unique
+                           art_soil$family)))) # 3 unique
 
-art_roll %>%
+(roll_unique <- art_roll %>%
   filter(family %notin% unique(c(art_spray$family, 
                            art_water$family,
-                           art_soil$family))) # 10 unique
+                           art_soil$family)))) # 10 unique
 
-art_water %>%
+(water_unique <- art_water %>%
   filter(family %notin% unique(c(art_spray$family, 
                            art_roll$family,
-                           art_soil$family))) # 2 unique
+                           art_soil$family)))) # 2 unique
 
-art_soil %>%
+(soil_unique <- art_soil %>%
   filter(family %notin% unique(c(art_spray$family, 
                            art_roll$family,
-                           art_water$family))) # 4 unique
+                           art_water$family)))) # 4 unique
 
 # Venn diagram of the 4 methods
 # code from: https://www.datanovia.com/en/blog/venn-diagram-with-r-or-rstudio-a-million-ways/
 # devtools::install_github("yanlinlin82/ggvenn")
-
-set.seed(20190708)
-genes <- paste("gene",1:1000,sep="")
-x <- list(
-  A = sample(genes,300), 
-  B = sample(genes,525), 
-  C = sample(genes,440),
-  D = sample(genes,350)
-  )
 
 venn_methods <- list(
   Soil = art_soil$family,
@@ -379,8 +367,9 @@ ggvenn(
   text_size = 3
   )
 
-ggsave("figures/venn2.jpg", height = 6, width = 6, dpi = 400)
+ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
 
+# pairwise overlap (manually counted from Venn diagram)
 # spray-roller: 58 overlapping of 80 total (73% overlap)
 # water-roller: 49 overlapping of 75 total (65% overlap)
 # soil-roller: 28 overlapping of 81 total (35% overlap)
@@ -388,27 +377,84 @@ ggsave("figures/venn2.jpg", height = 6, width = 6, dpi = 400)
 # soil-spray: 34 overlapping of 71 total (48% overlap)
 # soil-water: 27 overlapping of 64 total (42% overlap)
 
+# how many families not detected by roller/spray in both studies
+art_water %>%
+  bind_rows(art_soil) %>%
+  distinct() %>%
+  # families 1-177 are from the roller/spray 'primary study'
+  filter(family %notin% unique(c(size$family[1:177], 
+                          art_spray$family,
+                          art_roll$family)))
+
+# answer: 3 (all of which were unique to soil)
+# 1 Trogidae     (hide beetles)
+# 2 Keroplatidae (fungus gnats)
+# 3 Nycteribiidae (bat flies)
+
+rm(art_spray, art_water, art_roll, art_soil,
+   soil_unique, spray_unique, roll_unique, water_unique,
+   venn_methods)
 ```
-
-# Family abundance distribution by method
+# Make Table S1
 ```{r}
-pasum %>%
-  select(rank = roll.rank, pa = roll.pa) %>%
-  bind_rows(select(pasum, rank = spray.rank, pa = spray.pa)) %>%
-  mutate(method = c(rep("Roller", 177), rep("Spray", 177))) %>%
-  ggplot() +
-  geom_line(aes(x = rank, y = pa*100, color = method), 
-             size = 1) +
-  scale_color_manual(values = c("firebrick", "steelblue")) +
-  labs(x = "Families (rank order)",
-       y = "Prevalence in samples (%)",
-       color = "") +
-  theme_classic() +
-  theme(text = element_text(size = 14),
-        legend.position = c(.8,.8))
+# subdivide 'art' into columns by sampling method for counting
+art_spray <- art %>%
+  select(class, order, family, contains(c("S3", "S4", "S5"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(class, order, family) %>%
+  distinct() %>%
+  arrange(class, order, family) %>%
+  mutate(method = "Spray")
 
-ggsave("figures/PlotB_family_abundance_distribution_roller_spray.jpg", 
-       height = 6, width = 6, dpi = 400)
+art_roll <- art %>%
+  select(class, order, family, family, contains(c(":R"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(class, order, family) %>%
+  distinct() %>%
+  arrange(class, order, family) %>%
+  mutate(method = "Roller")
+
+art_water <- art %>%
+  select(class, order, family, family, contains(c(":W"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(class, order, family) %>%
+  distinct() %>%
+  arrange(class, order, family) %>%
+  mutate(method = "Water")
+
+art_soil <- art %>%
+  select(class, order, family, family, contains(c(":D"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(class, order, family) %>%
+  distinct() %>%
+  arrange(class, order, family) %>%
+  mutate(method = "Soil")
+
+tab <- art_roll %>%
+  bind_rows(art_spray, art_soil, art_water) %>%
+  mutate(value = 1) %>%
+  tidyr:: pivot_wider(id_cols = class:family,
+                      values_from = value,
+                      names_from = method) %>%
+  arrange(class, order, family)
+tab[is.na(tab)] <- 0
+
+library(kableExtra)
+ tables1 <- tab %>%
+  kbl(caption = "A good title") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+
+# save the table to HTML file
+save_kable(tables1,
+           "figures/TableS1_substrate_compare_families.html")
+
+rm(art_spray, art_water, art_roll, art_soil, tab, tables1)
+
 ```
 # Format data for the heat trees
 ```{r}
