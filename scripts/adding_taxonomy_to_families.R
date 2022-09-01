@@ -1,93 +1,29 @@
 # This contains various scripts to assign higher taxonomic ranks
 #    and also to format the trait databases
 
-# Assigning orders to families
+# Assigning orders to families or other taxa listed in "final_lowest"
 # used the NCBI taxonomy to look up each family
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5887078/
 #   
 #   then added orders etc. using taxize
-# 
-# Then added "niche" trait data by family from the database in this pre-print:
-#   https://doi.org/10.1101/2022.01.25.477751
-# 
-# And size info from:
-#   https://opentraits.org/datasets/arthropod-species-traits
-# https://www.doi.org/10.1038/sdata.2015.13
-# https://datadryad.org/stash/dataset/doi:10.5061/dryad.53ds2
-
-library(taxa)
-fam <- read.csv("data/arthropod.families.20220708.csv")
-trait <- read.csv("data/insect_trait_tool.csv", skip = 1)
-size <- read.csv("data/arthropod_size_db.csv") %>%
-  group_by(Order, Family) %>%
-  # there are no NA Body Sizes FYI
-  summarize(size_min = min(Body_Size),
-            size_max = max(Body_Size),
-            size_avg = mean(Body_Size),
-            size_n = length(Body_Size)) %>%
-  rename(family = Family)
-
-size_guild <- read.csv("data/arthropod_size_db.csv") %>%
-  group_by(Order, Family, Feeding_guild) %>%
-  tally() %>%
-  select(family = Family, Feeding_guild)
-
-size_guild1 <- table(size_guild$family, 
-                     size_guild$Feeding_guild)
-size_guild2 = matrix(size_guild1,
-                     nrow = 96, ncol = 13) %>%
-  as.data.frame()
-
-size_guild3 <- size_guild2 %>%
-  mutate(family = rownames(size_guild1))
-
-colnames(size_guild3) <- c(colnames(size_guild1), "family")
-
-
-(ncbi <- tax_db(
-  name = "ncbi",
-  url = "http://www.ncbi.nlm.nih.gov/taxonomy",
-  description = "NCBI Taxonomy Database",
-  id_regex = "*"
-))
-
-fam2 <- unique(fam$final_family)[is.na(unique(fam$final_family))==F]
-
-# Convert a taxonomy object to a taxon vector
-x <- taxonomy(taxon(name = fam2,
-                    rank = rep(c('family'), 182),
-                    db = 'ncbi'))
-
-test=supertaxa(x)
 
 library(taxize)
 library(dplyr)
+library(readxl)
 
-# add orders to the family names based on NCBI database
-# takes a long time
-orders <- tax_name(sci = fam2, 
-                   get = c("order", "class"), db = "ncbi")
+# set which arthropod.families database to use
+tax_data_path <- "data/arthropod.families_20220831.xlsx"
 
-
-orders2 <- orders %>%
-  rename(family = query) %>%
-  left_join(trait, by = "family") %>%
-  select(-33) %>%
-  # excludes 2 salamanders, 1 bat, 3 gastropods, 1 worm, and 2 unknown
-  filter(class %in% c("Insecta", "Arachnida", 
-                      "Chilopoda", "Collembola")) %>%
-  arrange(class, order, family) %>%
-  left_join(size, by = "family") %>%
-  left_join(size_guild3, by = "family")
-
-write.csv(orders2, "data/arthropod.families.traits.csv",
-          row.names = F)
-
-
+# read in arthropod.families database
+famlookup <- read_xlsx(tax_data_path, 
+                       sheet = "arthropod.families") %>%
+  select(final_lowest, 
+         final_ID = 'final species_name',
+         family:kingdom) %>%
+  distinct()
 
 #### adding higher taxa
-library(taxize)
-library(dplyr)
+
 # add orders to the lowest taxa rank based on NCBI database
 full_taxa_lookup <- taxize::tax_name(sci = unique(famlookup$final_lowest), 
                    get = c("family", "order", "class", 
@@ -96,9 +32,6 @@ full_taxa_lookup <- taxize::tax_name(sci = unique(famlookup$final_lowest),
 
 
 # make new columns for the "arthropod.families" database
-
-# path for taxonomy and ecology lookup tables
-tax_data_path <- "data/arthropod.families_20220831.xlsx"
 
 # read in family name look up 
 # will use to match each OTU with an NCBI family name
@@ -113,3 +46,36 @@ full_taxa_lookup2 <- read_xlsx(tax_data_path,
 write.csv(full_taxa_lookup2, "data/arthropod.higher.taxa.lookup3.csv",
           row.names = F)
 
+
+#######
+### getting families that are unique to the 'substrate compare' study
+#######
+
+# 1st run the initial code chunk in 'pinelands_arthropods_2methods.Rmd'
+# that loads the 'size' object
+    #which lists the 177 arthropod families from the primary study
+
+unique(size$family)
+'%notin%' <- Negate('%in%')
+
+# get list of all families (both studies)
+all_fams = full_taxa_lookup2 %>%
+  filter(phylum == "Arthropoda",
+         family != "NA",
+         is.na(family)==F) %>%
+  select(family) %>%
+  distinct()
+
+# get trait info from ITT
+trait <- read.csv("data/insect_trait_tool.csv", skip = 1)
+
+# subset just the families from substrate compare'
+# and add ITT trait info where available
+just_sub <- all_fams %>%
+  filter(family %notin% size$family) %>%
+  left_join(distinct(select(full_taxa_lookup2, 
+                            family, order, class))) %>%
+  left_join(trait)
+
+
+write.csv(just_sub, "data/just_sub_families.csv", row.names = F)
