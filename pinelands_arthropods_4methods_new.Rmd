@@ -1435,7 +1435,7 @@ sort(apply(coleop_rare_mat, 1, sum))
 apply(zeale_rare_mat, 1, sum)
 sort(apply(zeale_rare_mat, 1, sum))
 
-# get lowest number of reads, excluding the 1 sample with only 195
+# get lowest number of reads
 minreads <- 770
 
 rarefy_coleop <- rarefy(coleop_rare_mat[,], minreads, se = T)

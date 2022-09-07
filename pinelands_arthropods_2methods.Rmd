@@ -443,7 +443,7 @@ and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-c
 # format data matrices
 spray_mat <- pa_fam_s %>%
   t()
-spray_roll_mat[spray_roll_mat>0] <- 1 
+spray_mat[spray_mat>0] <- 1 
 
 roll_mat <- pa_fam_r %>%
   t()
@@ -452,9 +452,14 @@ roll_mat[roll_mat>0] <- 1
 both_mat <- spray_mat + roll_mat
 both_mat[both_mat>0] <- 1 
 
-accum.spray <- accumcomp(spray_mat, 
+# version of spray mat excluding the 3 "blank" samples (nb = no)
+spray_mat_nb <- pa_fam_s[,-c(11,13,19)] %>%
+  t()
+spray_mat_nb[spray_mat_nb>0] <- 1 
+
+accum.spray <- accumcomp(spray_mat_nb, 
                      y=data.frame(method = rep("spray", 
-                                               nrow(spray_mat))),
+                                               nrow(spray_mat_nb))),
                      factor='method', 
   method='exact', conditioned=FALSE, plotit=FALSE)
 accum.spray
@@ -504,7 +509,7 @@ ggplot(plot.data) +
   labs(x = "No. samples", y = "No. families", fill = "")
 
 
-ggsave("figures/PlotE_species_accumulation_curve_spray_roll2.jpg",
+ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
        dpi = 600, width = 6, height = 4)
 ```
 # specpool: Extrapolated Species Richness
@@ -512,7 +517,12 @@ ggsave("figures/PlotE_species_accumulation_curve_spray_roll2.jpg",
 # format data matrices
 spray_mat <- pa_fam_s %>%
   t()
-spray_roll_mat[spray_roll_mat>0] <- 1 
+spray_mat[spray_mat>0] <- 1 
+
+# version of spray mat excluding the 3 "blank" samples (nb = no)
+spray_mat_nb <- pa_fam_s[,-c(11,13,19)] %>%
+  t()
+spray_mat_nb[spray_mat_nb>0] <- 1 
 
 roll_mat <- pa_fam_r %>%
   t()
@@ -525,7 +535,7 @@ specpool(roll_mat)
 # Species     chao chao.se jack1 jack1.se    jack2     boot  boot.se  n
 # 126 162.1905 15.1504   164 10.22252 182.0947 143.7408 5.816372 20
 
-specpool(spray_mat)
+specpool(spray_mat_nb)
 # Species  chao  chao.se  jack1 jack1.se    jack2     boot  boot.se  n
 # 148 189.971 16.19735 192.65 13.10029 213.6342 168.3491 7.391802 20
 
@@ -897,6 +907,9 @@ dat <- feed_freq_sum
 dat$a1 <- 1
 dat$size <- with(dat, mult + myce + para + phyt + pred + scav)
 dat$y <- with(dat, cbind(mult, myce, para, phyt, pred, scav))
+# remove 3 blank samples
+dat <- dat %>%
+  filter(size > 0)
 
 # model with both method and tree type
 set.seed(102)
@@ -928,20 +941,21 @@ fit.tree <- add_criterion(fit.tree, "loo",
                           reloo = TRUE)
 
 # save model output so we don't have to refit each time
-saveRDS(fit.method.tree, "output/feed_multinomial_method.tree.rds")
-saveRDS(fit.method, "output/feed_multinomial_method.rds")
-saveRDS(fit.tree, "output/feed_multinomial_tree.rds")
+saveRDS(fit.method.tree, "output/feed_multinomial_method.tree_nb.rds")
+saveRDS(fit.method, "output/feed_multinomial_method_nb.rds")
+saveRDS(fit.tree, "output/feed_multinomial_tree_nb.rds")
 
 # load the models so we don't have to refit them each time
-fit.method.tree <- readRDS("output/feed_multinomial_method.tree.rds")
-fit.method <- readRDS("output/feed_multinomial_method.rds")
-fit.tree <- readRDS("output/feed_multinomial_tree.rds")
+fit.method.tree <- readRDS("output/feed_multinomial_method.tree_nb.rds")
+fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
+fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
 
 # evaluating models based on LOOIC
 brms::loo_compare(fit.method.tree, fit.method, fit.tree, 
             criterion = "loo") %>% 
   print(simplify = F)
 
+# method is lowest, delta looic = 2.6
 ```
 # multinomial models for lifemode data
 https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
@@ -978,6 +992,9 @@ library(brms)
 dat <- life_freq_sum
 dat$size <- with(dat, aqlar + fullaq + fullter + someaq)
 dat$y <- with(dat, cbind(aqlar, fullaq, fullter, someaq))
+# remove 3 blank samples
+dat <- dat %>%
+  filter(size > 0)
 
 # model with both method and tree type
 set.seed(102)
@@ -1015,19 +1032,21 @@ life.tree <- brms::add_criterion(life.tree, "loo",
                           reloo = TRUE)
 
 # save model output so we don't have to refit each time
-saveRDS(life.method.tree, "output/life_multinomial_method.tree.rds")
-saveRDS(life.method, "output/life_multinomial_method.rds")
-saveRDS(life.tree, "output/life_multinomial_tree.rds")
+saveRDS(life.method.tree, "output/life_multinomial_method.tree_nb.rds")
+saveRDS(life.method, "output/life_multinomial_method_nb.rds")
+saveRDS(life.tree, "output/life_multinomial_tree_nb.rds")
 
 # load the models so we don't have to refit them each time
-life.method.tree <- readRDS("output/life_multinomial_method.tree.rds")
-life.method <- readRDS("output/life_multinomial_method.rds")
-life.tree <- readRDS("output/life_multinomial_tree.rds")
+life.method.tree <- readRDS("output/life_multinomial_method.tree_nb.rds")
+life.method <- readRDS("output/life_multinomial_method_nb.rds")
+life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
 
 # evaluating models based on LOOIC
 brms::loo_compare(life.method.tree, life.method, life.tree, 
             criterion = "loo") %>% 
   print(simplify = F)
+
+# method is lowest, delta looic = 3.2
 ```
 # multinomial models for size data
 https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
@@ -1064,6 +1083,9 @@ size_freq_sum <- size_freq_sum2 %>%
 dat <- size_freq_sum
 dat$size <- with(dat, vsmal + vbig + big + smal)
 dat$y <- with(dat, cbind(vsmal, vbig, big, smal))
+# remove 3 blank samples
+dat <- dat %>%
+  filter(size > 0)
 
 # model with both method and tree type
 set.seed(102)
@@ -1101,28 +1123,30 @@ size.tree <- brms::add_criterion(size.tree, "loo",
                           reloo = TRUE)
 
 # save model output so we don't have to refit each time
-saveRDS(size.method.tree, "output/size_multinomial_method.tree.rds")
-saveRDS(size.method, "output/size_multinomial_method.rds")
-saveRDS(size.tree, "output/size_multinomial_tree.rds")
+saveRDS(size.method.tree, "output/size_multinomial_method.tree_nb.rds")
+saveRDS(size.method, "output/size_multinomial_method_nb.rds")
+saveRDS(size.tree, "output/size_multinomial_tree_nb.rds")
 
 # load the models so we don't have to refit them each time
-size.method.tree <- readRDS("output/size_multinomial_method.tree.rds")
-size.method <- readRDS("output/size_multinomial_method.rds")
-size.tree <- readRDS("output/size_multinomial_tree.rds")
+size.method.tree <- readRDS("output/size_multinomial_method.tree_nb.rds")
+size.method <- readRDS("output/size_multinomial_method_nb.rds")
+size.tree <- readRDS("output/size_multinomial_tree_nb.rds")
 
 # evaluating models based on LOOIC
 brms::loo_compare(size.method.tree, size.method, size.tree, 
             criterion = "loo") %>% 
   print(simplify = F)
+
+# method is lowest; delta looic = 4.7
 ```
 # Multinomial model plots (feeding, life mode, body size)
 ```{r}
 ### Feeding guild
 
 # load the models so we don't have to refit them each time
-fit.method.tree <- readRDS("output/feed_multinomial_method.tree.rds")
-fit.method <- readRDS("output/feed_multinomial_method.rds")
-fit.tree <- readRDS("output/feed_multinomial_tree.rds")
+fit.method.tree <- readRDS("output/feed_multinomial_method.tree_nb.rds")
+fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
+fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
 
 # plot top model predictions
 fit.newdata = expand.grid(method = c("S", "R"),
@@ -1162,7 +1186,7 @@ fits_df %>%
   geom_point(aes(y = feed, x = 100*Estimate, color = method, 
                  group = method),
              position = position_dodge(width = .75),
-             size = 3) +
+             size = 2) +
   geom_errorbar(aes(y = feed, xmin = 100*Q10, 
                     xmax = 100*Q90, color = method,
                     group = method),
@@ -1187,9 +1211,9 @@ fits_df %>%
 ### Life mode
 
 # load the models so we don't have to refit them each time
-life.method.tree <- readRDS("output/life_multinomial_method.tree.rds")
-life.method <- readRDS("output/life_multinomial_method.rds")
-life.tree <- readRDS("output/life_multinomial_tree.rds")
+life.method.tree <- readRDS("output/life_multinomial_method.tree_nb.rds")
+life.method <- readRDS("output/life_multinomial_method_nb.rds")
+life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
 
 # plot top model predictions
 fit.newdata = expand.grid(method = c("S", "R"),
@@ -1226,7 +1250,7 @@ life_fits_df %>%
   geom_point(aes(y = life, x = 100*Estimate, color = method, 
                  group = method),
              position = position_dodge(width = .75),
-             size = 3) +
+             size = 2) +
   geom_errorbar(aes(y = life, xmin = 100*Q10, 
                     xmax = 100*Q90, color = method,
                     group = method),
@@ -1290,7 +1314,7 @@ size_fits_df %>%
   geom_point(aes(y = size, x = 100*Estimate, color = method, 
                  group = method),
              position = position_dodge(width = .5),
-             size = 3) +
+             size = 2) +
   geom_errorbar(aes(y = size, xmin = 100*Q10, 
                     xmax = 100*Q90, color = method,
                     group = method),
@@ -1315,7 +1339,7 @@ size_fits_df %>%
 ### Combine all 3 plots with patchwork
 feed_plot2 / life_plot2 / size_plot2
 
-ggsave("figures/PlotL_guilds_multinom2.jpg", 
+ggsave("figures/PlotL_guilds_multinom3.jpg", 
        width = 5, height = 12, dpi = 400)
 ```
 # Plot relative abundance of orders by method (both primers combined)
@@ -1404,13 +1428,16 @@ order_samps <- order_samps_roll %>%
   mutate(name = fct_reorder(name, order2, .desc = T)) %>%
   group_by(order) %>%
   mutate(mean_count = mean(count)) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(pct = case_when(method == "Roller" ~ count/20,
+                         method == "Spray" ~ count/17),
+         pct = 100*pct)
 
 (
 who2_plot <- 
 order_samps %>%
   ggplot() +
-  geom_col(aes(y = name, x = 100*(count/20),
+  geom_col(aes(y = name, x = pct,
                fill = method),
            position = position_dodge()) +
   scale_fill_manual(values = c("steelblue", "firebrick")) +
@@ -1438,9 +1465,9 @@ life_mosaic <- life_plot2 +
 size_mosaic <- size_plot2 +
   guides(color = "none")
 
-patchobj <- (feed_mosaic / life_mosaic / size_mosaic) | who2_plot
+(feed_mosaic / life_mosaic / size_mosaic) | who2_plot
 
-ggsave("figures/order_compare3.png", width = 7, height = 7, dpi = 400)
+ggsave("figures/Fig4_order_compare4.png", width = 7, height = 7, dpi = 400)
 ```
 
 
