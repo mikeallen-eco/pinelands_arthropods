@@ -20,20 +20,6 @@ z %>% filter(match >= 0.98,
              !is.na(species_name)) %>% 
   tally()
 
-# what families
-z %>% filter(match >= 0.95,
-             !is.na(family_name)) %>% 
-  select(family_name) %>%
-  arrange(family_name) %>%
-  distinct()
-
-# what orders
-z %>% filter(match >= 0.95,
-             !is.na(order_name)) %>% 
-  select(order_name) %>%
-  arrange(order_name) %>%
-  distinct()
-
 # that leaves 331 to blast
 zblast <- z %>% 
   filter(!(match >= 0.98 & !is.na(species_name)))
@@ -56,20 +42,6 @@ c <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm5.fix3.tag.ann
 c %>% filter(match >= 0.98,
              !is.na(species_name)) %>% 
   tally()
-
-# what families
-c %>% filter(match >= 0.95,
-             !is.na(family_name)) %>% 
-  select(family_name) %>%
-  arrange(family_name) %>%
-  distinct()
-
-# what orders
-c %>% filter(match >= 0.95,
-             !is.na(order_name)) %>% 
-  select(order_name) %>%
-  arrange(order_name) %>%
-  distinct()
 
 # that leaves 580 to blast
 cblast <- c %>% 
@@ -197,8 +169,8 @@ cn <- cc %>%
 # sum the reads across all negatives
 sum(select(cn, starts_with("sample"))) # 58965
 
-# write.csv(cs, file = "data/pinebugs.samples.step0.nofilters.Z.csv", row.names = F)
-# write.csv(cn, file = "data/pinebugs.negatives.step0.nofilters.Z.csv", row.names = F)
+# write.csv(cs, file = "data/pinebugs.samples.step0.nofilters.C.csv", row.names = F)
+# write.csv(cn, file = "data/pinebugs.negatives.step0.nofilters.C.csv", row.names = F)
 ```
 # remove humans, mice, and non-arthropods
 ```{r}
@@ -255,13 +227,138 @@ cn2 <- cn %>%
          !is.na(order))
 
 # sum the reads across all negatives
-sum(select(cn2, starts_with("sample"))) # 16847
+sum(select(cn2, starts_with("sample"))) # 5208
 
 # get the max read count of each seqid present in the negatives
-colnames(zn2) # check which columns contain negative samples
-zn2$seqmax <- apply(zn2[,10:15],1, max)
+colnames(cn2) # check which columns contain negative samples
+cn2$seqmax <- apply(cn2[,10:26],1, max)
 
-# write.csv(zs2, file = "data/pinebugs.samples.step1.onlyarth.Z.csv", row.names = F)
-# write.csv(zn2, file = "data/pinebugs.negatives.step1.onlyarth.Z.csv", row.names = F)
+# write.csv(zs2, file = "data/pinebugs.samples.step1.onlyarth.C.csv", row.names = F)
+# write.csv(zn2, file = "data/pinebugs.negatives.step1.onlyarth.C.csv", row.names = F)
 
 ```
+
+# subtract contamination found in negative controls
+```{r}
+
+#### Zeale ####
+
+# add the max reads by sequence in all the negatives
+zs3a <- zs2 %>%
+  left_join(select(zn2, id, seqmax), by = "id") %>%
+  data.frame()
+zs3 <- zs3a
+
+colnames(zs3) # 10:45 are the samples
+
+# zero out samples with less reads of a sequence than the max contamination among negative of that sequence
+for(i in 10:45){
+  tmp <- zs3a[,i] - zs3a$seqmax
+  tmp2 <- as.numeric(ifelse(tmp<0,0,tmp))
+  zs3[,i] <- tmp2
+}
+
+# count remaining reads in samples
+sum(select(zs3, starts_with("sample"))) # 3177355
+rm(zs3a)
+
+# look at sequence lengths
+hist(nchar(zs3$sequence))
+zs3$len <- nchar(zs3$sequence)
+
+# write.csv(zs3, file = "output/fish2023.samples.step2.onlyfish.negsub.Z.csv", row.names = F)
+
+#### Coleop ####
+
+# add the max reads by sequence in all the negatives
+cs3a <- cs2 %>%
+  left_join(select(cn2, id, seqmax), by = "id") %>%
+  data.frame()
+cs3 <- cs3a
+
+colnames(cs3) # 10:45 are the samples
+
+# zero out samples with less reads of a sequence than the max contamination among negative of that sequence
+for(i in 10:46){
+  tmp <- cs3a[,i] - cs3a$seqmax
+  tmp2 <- as.numeric(ifelse(tmp<0,0,tmp))
+  cs3[,i] <- tmp2
+}
+
+# count remaining reads in samples
+sum(select(cs3, starts_with("sample"))) # 1720363
+rm(cs3a)
+
+# look at sequence lengths
+hist(nchar(cs3$sequence))
+cs3$len <- nchar(cs3$sequence)
+
+# write.csv(cs3, file = "output/pinebugs.samples.step2.onlyarth.negsub.C.csv", row.names = F)
+
+```
+# tallying orders, families, species
+```{r}
+
+### Zeale ###
+
+# what species; n = 95
+zs3 %>% filter(match >= 0.98,
+             !is.na(species)) %>% 
+  select(species) %>%
+  arrange(species) %>%
+  distinct()
+
+# what genus; n = 116
+zs3 %>% filter(match >= 0.98,
+             !is.na(genus)) %>% 
+  select(genus) %>%
+  arrange(genus) %>%
+  distinct()
+
+# what families; n = 66
+zs3 %>% filter(match >= 0.95,
+             !is.na(family)) %>% 
+  select(family) %>%
+  arrange(family) %>%
+  distinct()
+
+# what orders; n = 11
+zs3 %>% filter(match >= 0.95,
+             !is.na(order)) %>% 
+  select(order) %>%
+  arrange(order) %>%
+  distinct()
+
+### Coleop ###
+
+# what species; n = 105
+cs3 %>% filter(match >= 0.99,
+             !is.na(species)) %>% 
+  select(species) %>%
+  arrange(species) %>%
+  distinct()
+
+# what genus; n = 127
+cs3 %>% filter(match >= 0.98,
+             !is.na(genus)) %>% 
+  select(genus) %>%
+  arrange(genus) %>%
+  distinct()
+
+# what families; n = 110
+cs3 %>% filter(match >= 0.95,
+             !is.na(family)) %>% 
+  select(family) %>%
+  arrange(family) %>%
+  distinct()
+
+# what orders; n = 23
+cs3 %>% filter(match >= 0.90,
+             !is.na(order)) %>% 
+  select(order) %>%
+  arrange(order) %>%
+  distinct()
+
+```
+
+
