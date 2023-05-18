@@ -1,0 +1,267 @@
+# read in data and load libraries
+```{r}
+library(dplyr)
+library(data.table)
+# library(CHNOSZ)
+'%notin%' <- Negate('%in%')
+
+### Zeale ###
+
+# Read in Zeale (COI) primer results (all raw data = 560 MOTUs)
+z0 <- fread("data/merged.uni.c10.l130.L185.sht.srt.nochi.1line.swarm7.fix3.tag.ann.srt.Z.tab.tsv") %>%
+  rename(match = 3) 
+
+z <- z %>%
+  filter(match >= 0.80)
+# 427 of 560 left
+
+# 96 are well matched to species already
+z %>% filter(match >= 0.98,
+             !is.na(species_name)) %>% 
+  tally()
+
+# what families
+z %>% filter(match >= 0.95,
+             !is.na(family_name)) %>% 
+  select(family_name) %>%
+  arrange(family_name) %>%
+  distinct()
+
+# what orders
+z %>% filter(match >= 0.95,
+             !is.na(order_name)) %>% 
+  select(order_name) %>%
+  arrange(order_name) %>%
+  distinct()
+
+# that leaves 331 to blast
+zblast <- z %>% 
+  filter(!(match >= 0.98 & !is.na(species_name)))
+
+# Read in Zeale (COI) primer read counts by sample
+zc <- fread("data/merged.uni.c10.l130.L185.sht.srt.nochi.1line.swarm7.Z_output.counts.csv")
+
+zz <- z %>%
+  left_join(zc)
+
+### Coleop ###
+
+# Read in Coleop (16S) primer results
+c <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm5.fix3.tag.ann.srt.C.tab.tsv") %>%
+  rename(match = 3) %>%
+  filter(match >= 0.80)
+# 687 of 773 left
+
+# 107 are well matched to species already
+c %>% filter(match >= 0.98,
+             !is.na(species_name)) %>% 
+  tally()
+
+# what families
+c %>% filter(match >= 0.95,
+             !is.na(family_name)) %>% 
+  select(family_name) %>%
+  arrange(family_name) %>%
+  distinct()
+
+# what orders
+c %>% filter(match >= 0.95,
+             !is.na(order_name)) %>% 
+  select(order_name) %>%
+  arrange(order_name) %>%
+  distinct()
+
+# that leaves 580 to blast
+cblast <- c %>% 
+  filter(!(match >= 0.98 & !is.na(species_name)))
+
+# Read in Zeale (COI) primer read counts by sample
+c2 <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm5.C_output.counts.csv")
+
+cc <- c %>%
+  left_join(c2)
+
+```
+# make fasta files to blast
+```{r}
+
+# Zeale
+
+# data.frame of the sequences to be blasted
+input_db <- zblast
+# Define names for the output files
+output_db <- "data/merged.uni.c10.l30.L185.sht.srt.nochi.1line.swarm7.fix3.tag.ann.srt.bla.Z.fasta"
+
+# Delete previous files
+db_file <- file(output_db,open = "wt")
+
+closeAllConnections()
+
+# Loop to write reference fasta file that will work with ecotag
+showlines <- 10
+
+for (i in 1:nrow(input_db)) {
+
+        # write it in db_file
+        output_file <- file(output_db, open = "at")
+        writeLines(text = paste0(">",as.character(input_db$id[i])),
+                   con = output_file)
+        writeLines(text = gsub("-","",as.character(input_db$sequence[i])), con = output_file)
+        close(output_file)
+        
+  if (i %% showlines == 0) message(i,"/",nrow(input_db)," sequences processed.","\r",appendLF = FALSE)
+}
+
+# Coleop
+
+# data.frame of the sequences to be blasted
+input_db <- cblast
+# Define names for the output files
+output_db <- "data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm5.fix3.tag.ann.srt.bla.C.fasta"
+
+# Delete previous files
+db_file <- file(output_db,open = "wt")
+
+closeAllConnections()
+
+# Loop to write reference fasta file that will work with ecotag
+showlines <- 10
+
+for (i in 1:nrow(input_db)) {
+
+        # write it in db_file
+        output_file <- file(output_db, open = "at")
+        writeLines(text = paste0(">",as.character(input_db$id[i])),
+                   con = output_file)
+        writeLines(text = gsub("-","",as.character(input_db$sequence[i])), con = output_file)
+        close(output_file)
+        
+  if (i %% showlines == 0) message(i,"/",nrow(input_db)," sequences processed.","\r",appendLF = FALSE)
+}
+
+
+```
+# separate the samples and negatives
+```{r}
+
+#### Zeale ####
+
+# check which columns are negatives
+colnames(zz) # input those column numbers in the next line
+negatives <- c(14,15,23,53,54,55)
+
+# select out just the samples
+zs <- zz %>%
+  select(-negatives) %>%
+  select(id, match, rank, order = order_name, family = family_name, 
+         genus = genus_name, species = species_name, sci = scientific_name, 
+         count = total_reads, starts_with("sample"), sequence)
+
+# sum the reads across all samples
+sum(select(zs, starts_with("sample"))) # 4115667
+
+# select out just the negatives
+zn <- zz %>%
+  select(id, match, rank, order = order_name, family = family_name, 
+         genus = genus_name, species = species_name, sci = scientific_name, 
+         count = total_reads, negatives, sequence)
+
+# sum the reads across all negatives
+sum(select(zn, starts_with("sample"))) # 997
+
+# write.csv(zs, file = "data/pinebugs.samples.step0.nofilters.Z.csv", row.names = F)
+# write.csv(zn, file = "data/pinebugs.negatives.step0.nofilters.Z.csv", row.names = F)
+
+#### Coleop ####
+
+# check which columns are negatives
+colnames(cc) # input those column numbers in the next line
+negatives.C <- c(14,15,23,24,55:67)
+
+# select out just the samples
+cs <- cc %>%
+  select(-all_of(negatives.C)) %>%
+  select(id, match, rank, order = order_name, family = family_name, 
+         genus = genus_name, species = species_name, sci = scientific_name, 
+         count = total_reads, starts_with("sample"), sequence)
+
+# sum the reads across all samples
+sum(select(cs, starts_with("sample"))) # 2218624
+
+# select out just the negatives
+cn <- cc %>%
+  select(id, match, rank, order = order_name, family = family_name, 
+         genus = genus_name, species = species_name, sci = scientific_name, 
+         count = total_reads, all_of(negatives.C), sequence)
+
+# sum the reads across all negatives
+sum(select(cn, starts_with("sample"))) # 58965
+
+# write.csv(cs, file = "data/pinebugs.samples.step0.nofilters.Z.csv", row.names = F)
+# write.csv(cn, file = "data/pinebugs.negatives.step0.nofilters.Z.csv", row.names = F)
+```
+# remove humans, mice, and non-arthropods
+```{r}
+
+### Zeale ###
+
+# filter out non-fish - samples
+zs2 <- zs %>%
+  # these don't seem to occur in this dataset, but leaving it in for now
+  filter(order %notin% c("Primates", "Rodentia", "Anseriformes", 
+                           "Caudata", "Galliformes", "Testudines",
+                              "Passeriformes", "Pelecaniformes",
+                           "Artiodactyla", "Carnivora"),
+         !is.na(order))
+sum(select(zs2, starts_with("sample"))) # 3191948
+
+# filter out non-fish - negatives
+zn2 <- zn %>%
+  filter(order %notin% c("Primates", "Rodentia", "Anseriformes", 
+                           "Caudata", "Galliformes", "Testudines",
+                              "Passeriformes", "Pelecaniformes",
+                           "Artiodactyla", "Carnivora"),
+         !is.na(order))
+
+# sum the reads across all negatives
+sum(select(zn2, starts_with("sample"))) # 997
+
+# get the max read count of each seqid present in the negatives
+colnames(zn2) # check which columns contain negative samples
+zn2$seqmax <- apply(zn2[,10:15],1, max)
+
+# write.csv(zs2, file = "data/pinebugs.samples.step1.onlyarth.Z.csv", row.names = F)
+# write.csv(zn2, file = "data/pinebugs.negatives.step1.onlyarth.Z.csv", row.names = F)
+
+
+### Coleop ###
+
+# filter out non-fish - samples
+cs2 <- cs %>%
+  # these don't seem to occur in this dataset, but leaving it in for now
+  filter(order %notin% c("Primates", "Rodentia", "Anseriformes", 
+                           "Caudata", "Galliformes", "Testudines",
+                              "Passeriformes", "Pelecaniformes",
+                           "Artiodactyla", "Carnivora"),
+         !is.na(order))
+sum(select(cs2, starts_with("sample"))) # 1726135
+
+# filter out non-fish - negatives
+cn2 <- cn %>%
+  filter(order %notin% c("Primates", "Rodentia", "Anseriformes", 
+                           "Caudata", "Galliformes", "Testudines",
+                              "Passeriformes", "Pelecaniformes",
+                           "Artiodactyla", "Carnivora"),
+         !is.na(order))
+
+# sum the reads across all negatives
+sum(select(cn2, starts_with("sample"))) # 16847
+
+# get the max read count of each seqid present in the negatives
+colnames(zn2) # check which columns contain negative samples
+zn2$seqmax <- apply(zn2[,10:15],1, max)
+
+# write.csv(zs2, file = "data/pinebugs.samples.step1.onlyarth.Z.csv", row.names = F)
+# write.csv(zn2, file = "data/pinebugs.negatives.step1.onlyarth.Z.csv", row.names = F)
+
+```

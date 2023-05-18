@@ -443,6 +443,35 @@ tab <- art_roll %>%
   arrange(class, order, family)
 tab[is.na(tab)] <- 0
 
+# see which method got/missed each order
+tab2 <- tab %>% group_by(order) %>% 
+  summarize(sumwat = sum(Water),
+            sumroll = sum(Roller),
+            sumsoil = sum(Soil),
+            sumspr = sum(Spray))
+
+tab2 %>% 
+  filter(sumwat == 0,
+         sumroll != 0,
+         sumspr != 0)
+
+tab2 %>% 
+  filter(sumsoil == 0,
+         sumroll != 0,
+         sumspr != 0)
+
+tab2 %>% 
+  filter(sumroll == 0,
+         sumwat != 0,
+         sumspr != 0,
+         sumsoil != 0)
+
+tab2 %>% 
+  filter(sumspr == 0,
+         sumwat != 0,
+         sumroll != 0,
+         sumsoil != 0)
+
 library(kableExtra)
  tables1 <- tab %>%
   kbl(caption = "A good title") %>%

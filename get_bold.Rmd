@@ -1,0 +1,241 @@
+# Note: all of this code is adapted from:
+https://github.com/metabarpark/R_scripts_querying_databases/blob/master/get_Reference_Database_from_BOLD.R
+
+# load pacakges
+```{r}
+library(dplyr)
+library(bold)
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# 
+# BiocManager::install("Biostrings")
+library(Biostrings)
+library(CHNOSZ)
+
+###################################################################
+# CUSTOMIZABLE SECTION  FOR OTHER TAXA AND PRIMERS:
+###################################################################
+# Define primers. This is the primer set from Fields et al. 2015.
+# Fields, A. T., Abercrombie, D. L., Eng, R., Feldheim, K., & Chapman, D. D. 
+# (2015). A novel mini-DNA barcoding assay to identify processed fins from 
+# internationally protected shark species. PloS one, 10(2), e0114844.
+primerF <- "AGATATTGGAACWTTATATTTTATTTTTGG"
+primerR <- "WACTAATCAATTWCCAAATCCTCC"
+expected_length <- 130:185
+primerset_name <- "Zeale"
+
+# Define taxon to query
+taxon_to_query <- "Orthoptera"
+
+# Define the directory where the taxonomy database will be created.
+taxdir <- "taxo/"
+
+###################################################################
+###################################################################
+
+# download taxonomy
+# Get the taxonomy dump from NCBI if it does not exist locally yet
+
+if (!file.exists(paste(taxdir,"nodes.dmp",sep=""))) {
+  message("Downloading Taxonomy Dump file from NCBI")
+  download.file("ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz",
+              paste(taxdir,"taxdump.tar.gz",sep=""))
+  untar(paste(taxdir,"taxdump.tar.gz",sep=""), exdir = taxdir)
+  file.remove(paste(taxdir,"taxdump.tar.gz",sep=""))
+}
+
+# Load the taxo dump in the RAM
+message("Now loading taxonomy database from ",taxdir)
+taxonames <- getnames(taxdir)
+taxonodes <- getnodes(taxdir)
+```
+
+# get sequences and add taxids
+```{r}
+message("Downloading sequences from Bold...")
+b2 <- bold_seq(taxon=taxon_to_query) 
+message("Now finding the taxids for ",nrow(b2)," sequences.")
+message("Please be patient! This will take a while...")
+if (length(b2)==0) {
+  message("No sequences found in BOLD for this taxon: ",taxon_to_query)
+  quit()
+}
+
+b <- b2 %>%
+  select(id = processid, species_name = identification, sequence)
+rm(b2)
+
+b$taxid <- ""
+
+showlines <- 10
+for (i in 1:nrow(b)){
+   x <- taxonames$id[taxonames$name==b$species_name[i] & taxonames$type=="scientific name"]
+   b$taxid[i] <- ifelse(identical(x,numeric(0)),"NA",x)
+   # Check if species name includes a "cf." in the middle and taxid exists when deleting it
+   if (grepl(" cf. ",b$species_name[i])) {
+     x <- taxonames$id[taxonames$name==gsub(" cf.","",b$species_name[i]) & 
+                         taxonames$type=="scientific name"] 
+     b$taxid[i] <- ifelse(identical(x,numeric(0)),"NA",x)
+   }
+     if (i %% showlines == 0) message(i,"/",nrow(b)," lines done. ","\r",appendLF = FALSE)
+}
+
+
+# Write the database with taxids
+write.table(b, paste0("bold_db_",taxon_to_query,".csv"),row.names=F,sep=",")
+message("File bold_db_", taxon_to_query, ".csv written with ",nrow(b)," sequences.")
+```
+# get ranks and make fastas
+```{r}
+# Load the database and add the taxonomic ranks
+bold_db <- read.table(paste0("bold_db_", taxon_to_query, ".csv"),sep=",",head=T)
+message("Now adding the ranks")
+bold_db$rank <- getrank(bold_db$taxid,taxdir)
+rm(b)
+
+# Define names for the output files
+output_ref_db <- paste("ref_db_",primerset_name,"_",taxon_to_query,".fas",sep="")
+output_new_taxa <- paste("new_taxa_",taxon_to_query,".txt",sep="")
+discarded_wronglength <- paste("discarded_",primerset_name,"_",taxon_to_query,"_wrong_length.fas",sep="")
+discarded_no_species <- paste("discarded_",primerset_name,"_",taxon_to_query,"_no_species.fas",sep="")
+discarded_no_genus <- paste("discarded_",primerset_name,"_",taxon_to_query,"_no_genus.fas",sep="")
+
+# Delete previous files
+db_ref_file <- file(output_ref_db,open = "wt")
+discarded_wronglength_file <- file(discarded_wronglength,open = "wt")
+discarded_no_species_file <- file(discarded_no_species,open = "wt")
+discarded_no_genus_file <- file(discarded_no_genus,open = "wt")
+new_taxa_file <- file(output_new_taxa,open = "wt")
+closeAllConnections()
+
+# Define initial number for new taxids to be added to the ecopcr database
+new_taxid_start <- as.integer(20000000)
+new_taxid <- new_taxid_start
+
+# Load the package for DNA string processing
+primerF <- DNAString(primerF)
+primerR <- DNAString(primerR)
+
+# Main loop
+count_ref <- 0
+count_new_taxa <- 0
+count_no_genus <- 0
+count_no_sp <- 0
+count_wrong_length <- 0
+created_taxids <- data.frame(species_name="",taxid="",stringsAsFactors = F)
+
+# This loop will align the sequences with the primers specified
+# And will keep those sequences that are the right length, as expected.
+
+message("Now performing in silico PCR analyses")
+message("Please patient! This will take a while...")
+for (i in 1:500) { #for (i in 1:nrow(bold_db)) {
+  # Align sequence with primers
+  sequence_character <- gsub("\n","",as.character(bold_db$sequence[i]))
+  seq <- DNAString(sequence_character)
+  alignmentF <- pairwiseAlignment(pattern = primerF,subject = seq,type="global-local",gapOpening=200)
+  start <- alignmentF@subject@range@start+nchar(primerF)
+  if (score(alignmentF)<=0) start <- 1
+  alignmentR <- pairwiseAlignment(pattern = reverseComplement(primerR),subject = sequence_character,type="global-local",gapOpening=200)
+  end <- alignmentR@subject@range@start-1
+  if (score(alignmentR)<=0) end <- nchar(seq)
+  reduced_seq <- seq[start:end]
+  
+    # If the length of reduced_seq is right, add the sequence to the reference_database
+  if (nchar(reduced_seq) %in% expected_length) { # IF_1 (CORRECT LENGTH)
+      # If taxid exist, write the line in ref_db.fasta
+      if (!is.na(bold_db$taxid[i])){ # IF_2 (TAXID EXISTS)
+        # If the rank is species or lower, write it in db_file, else write it in discarded_no_species file
+        outfile <- ifelse(bold_db$rank[i] %in% c("species","subspecies","forma","varietas"), output_ref_db, discarded_no_species)
+        output_file <- file(outfile,open = "at")
+        writeLines(text = paste(">",as.character(bold_db$id[i]),"; species_name=",as.character(bold_db$species_name[i]),
+                                "; rank=",as.character(bold_db$rank[i]),"; origin = BOLD; taxid=",as.integer(bold_db$taxid[i]),";",sep=""),con = output_file)
+        writeLines(text = gsub("-","",as.character(reduced_seq)),con = output_file)
+        if (bold_db$rank[i] %in% c("species","subspecies","forma","varietas")) {count_ref <- count_ref +1} else {count_no_sp <- count_no_sp+1}
+        close(output_file)
+      } else { # ELSE_2 (TAXID DOESN'T EXISTS)
+      # If taxid doesn't exist, create a new local taxid and then write the line in the reference database
+      # Check if the species taxid has been already created as new taxid
+        if (bold_db$species_name[i] %in% created_taxids$species_name) { # IF_3 (THE NEW TAXID IS ALREADY CREATED)
+          # If the taxid has been created, just add the line to the reference database
+          output_file <- file(output_ref_db,open = "at")
+          writeLines(text = paste(">",bold_db$id[i],"; species_name=",bold_db$species_name[i],"; rank=species; origin = BOLD; taxid=",
+                            as.integer(created_taxids$taxid[created_taxids$species_name==bold_db$species_name[i]]),";",sep=""),con = output_file)      
+          writeLines(text = gsub("-","",as.character(reduced_seq)),con = output_file)
+          count_ref <- count_ref +1
+          close(output_file)  
+        } else { # ELSE_3 (THE NEW TAXID IS NOT CREATED YET)
+          # If the taxid has not been created yet, create it
+          # Create a new local taxid  
+          bold_db$taxid[i] <- new_taxid
+          new_taxid <- as.integer(new_taxid+1)
+          #get genus name and taxid
+          genus_name <- strsplit(as.character(bold_db$species_name[i])," ")[[1]][[1]]
+          genus_taxid <- taxonames$id[taxonames$name==genus_name & taxonames$type=="scientific name"]
+          # if genus is valid, add line to file for obitaxonomy and add sequence to reference database
+          if (!identical(genus_taxid,numeric(0))) { # IF_4: VALID GENUS
+            output_file <- file(output_new_taxa,open = "at")
+              writeLines(text = paste(">",bold_db$id[i]," species_name=",bold_db$species_name[i],
+                                "; genus=",genus_taxid,"; local_taxid=",bold_db$taxid[i],";",sep=""),con = output_file)
+              writeLines(text = gsub("-","",as.character(reduced_seq)),con = output_file)
+              count_new_taxa <- count_new_taxa +1
+              created_taxids <- rbind(created_taxids,c(as.character(bold_db$species_name[i]),as.character(bold_db$taxid[i])))
+            close(output_file)
+            output_file <- file(output_ref_db,open = "at")
+              writeLines(text = paste(">",bold_db$id[i],"; species_name=",bold_db$species_name[i],"; rank=species; origin = BOLD; taxid=",bold_db$taxid[i],";",sep=""),con = output_file)      
+              writeLines(text = gsub("-","",as.character(reduced_seq)),con = output_file)
+              count_ref <- count_ref +1
+            close(output_file)
+          } else { # ELSE_4: INVALID GENUS
+          # Add to discarded files due to unknown genus taxid
+          discarded_file <- file(discarded_no_genus,open = "at")
+            writeLines(text = paste(">",bold_db$id[i],"; species_name=",bold_db$species_name[i],"; origin = BOLD; problem=no_valid_genus_taxid",sep=""),con = discarded_file)
+            writeLines(text = gsub("-","",as.character(reduced_seq)),con = discarded_file)
+            count_no_genus <- count_no_genus +1
+          close(discarded_file)  
+        }
+      }
+      }
+   }  else { # Add to discarded files due to wrong length # ELSE_1 (WRONG LENGTH)
+      discarded_file <- file(discarded_wronglength,open = "at")
+      writeLines(text = paste(">",bold_db$id[i],"; species_name=",bold_db$species_name[i],"; origin = BOLD; problem=wrong_fragment_length",sep=""),con = discarded_file)
+      writeLines(text = gsub("-","",as.character(reduced_seq)),con = discarded_file)
+      count_wrong_length <- count_wrong_length+1
+      close(discarded_file)  
+   }
+  if (i %% showlines == 0) message(i,"/",nrow(bold_db)," sequences processed.","\r",appendLF = FALSE)
+}
+  message(nrow(bold_db)," sequences from BOLD processed.")
+  message(count_ref," sequences added to reference database in file ",output_ref_db)
+  message(count_no_sp," sequences discarded because no valid species identification retrieved from BOLD, written to file ",discarded_no_species)
+  message(count_no_genus," sequences discarded because no valid genus taxid found, written to file ",discarded_no_genus)
+  message(count_wrong_length," sequences discarded because in silico PCR fragment had wrong length, written to file ",discarded_wronglength)
+  message(count_new_taxa," new species taxids added to file ",output_new_taxa," to be processed using obitaxonomy:")
+  message("Please use: obitaxonomy -d ",taxdir,"new_taxo -m ",new_taxid_start," -A genus -F ",getwd(),"/",output_new_taxa)
+
+
+# Look for information about sequences with no-species identification
+  discarded_no_species <- paste("discarded_",primerset_name,"_",taxon_to_query,"_no_species.fas",sep="")
+  no_species <- readLines(discarded_no_species)
+  no_species_head <- no_species[seq(1,length(no_species)-1,by=2)]
+  unknown_ids <- substr(no_species_head,2,regexpr(";",no_species_head)-1)
+  message("Extracting data from sequences with no species taxid.")
+  bin_info <- NULL
+  for (un_id in unknown_ids)  {
+    message("Processing specimen: ",un_id,"\r",appendLF = FALSE)
+    bin_info[un_id] <- ifelse(("bin_uri" %in% colnames(bold_specimens(ids = un_id))),bold_specimens(ids = un_id)$bin_uri,"")
+  }
+  showlines <- 10
+  spec_info <- bold_specimens(bin=bin_info[1])
+  blank_df <- data.frame(t(rep("NO_INFO",ncol(spec_info))))
+  names(blank_df) <- colnames(spec_info)
+  for (i in 2:length(bin_info))  {
+    if (!is.na(bin_info[i])) {add_to_spec_info <- bold_specimens(bin=bin_info[i])} else {
+      add_to_spec_info <- data.frame(processid=names(bin_info[i]),blank_df[,2:ncol(spec_info)],stringsAsFactors = F)}
+    spec_info <- rbind(spec_info,data.frame(add_to_spec_info,stringsAsFactors = F))
+    if (i %% showlines == 0) message(i,"/",length(bin_info)," specimens processed.","\r",appendLF = FALSE)
+  }
+  write.table(spec_info,"specimens_data_from_BOLD.csv",sep=",",row.names=F)
+  message("Written data from sequences with no species taxid in file: specimens_data_from_BOLD.csv")
+```
+

@@ -436,7 +436,7 @@ heat_tree(obj,
 ggsave("figures/PlotD_Spray_Roll_difference.jpg",
    width = 7, height = 7, dpi = 400)
 ```
-# Species accumulation curves
+# Accumulation curves
 used code from here: https://rpubs.com/Roeland-KINDT/694021
 and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
 ```{r}
@@ -502,6 +502,7 @@ ggplot(plot.data) +
                   ymax = s+2*sd, fill = method),
               alpha = 0.5) +  
   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+  # geom_line(aes(x = samp, y = pred), data = pred) +
   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
   theme_bw() +
   theme(text = element_text(size = 14),
@@ -511,6 +512,26 @@ ggplot(plot.data) +
 
 ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
        dpi = 600, width = 6, height = 4)
+
+## Fit Lomolino model to the exact accumulation
+mod1 <- fitspecaccum(both_mat, method = "exact", model = "lomolino"); AIC(mod1)
+mod <- fitspecaccum(both_mat, method = "exact", model = "arrhenius"); AIC(mod)
+mod <- fitspecaccum(both_mat, method = "exact", model = "gleason"); AIC(mod)
+mod <- fitspecaccum(both_mat, method = "exact", model = "gitay"); AIC(mod)
+mod <- fitspecaccum(both_mat, method = "exact", model = "asymp"); AIC(mod)
+mod <- fitspecaccum(both_mat, method = "exact", model = "gompertz"); AIC(mod)
+mod <- fitspecaccum(both_mat, method = "exact", model = "michaelis-menten"); AIC(mod)
+mod <- fitspecaccum(both_mat, method = "exact", model = "logis"); AIC(mod)
+mod1 <- fitspecaccum(both_mat, method = "exact", model = "weibull"); AIC(mod1)
+
+coef(mod1)
+fitted(mod1)
+plot(both_mat)
+
+plot(mod1, add = F, col=2, lwd=2)
+pred = data.frame(samp = 1:80,
+                  pred = predict(mod1, newdata = data.frame(Sites = 1:80)))
+pred
 ```
 # specpool: Extrapolated Species Richness
 ```{r}
