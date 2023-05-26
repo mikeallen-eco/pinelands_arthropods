@@ -7,7 +7,7 @@ library(dplyr)
 # library(metacoder)
 library(readxl)
 library(ggplot2)
-# library(stringr)
+library(stringr)
 # library(taxa)
 # library(vegan)
 library(BiodiversityR)
@@ -162,63 +162,6 @@ size <- read_xlsx(tax_data_path,
                            Body_Size == "Unknown" ~ 1)
   )
 
-# read in OTU data for coleop primer set and add higher taxonomy
-# coleop <- read_xlsx("data/coleop.9.final.meta.xlsx", 
-#                     sheet = "Sheet1") %>%
-#   rename(final_ID = 'final species_name') %>%
-#   left_join(famlookup, by = "final_ID") %>%
-#   select(kingdom, phylum, class, order, family, 
-#          final_lowest, final_ID, starts_with("sample")) %>%
-#   mutate(primer = "coleop") %>%
-#   select(primer, phylum, class, order, family, 
-#          final_lowest,
-#          final_ID, starts_with("sample")) %>%
-#   arrange(primer, phylum, class, order, family, final_ID)
-
-# check for missed family-level arthropods in coleop dataset
-    # view this object and scan final_ID's with both family & order==NA
-    # should be only those not identified to order
-    # if "final_lowest" is family, then it was not read right by taxize
-# coleop_check <- coleop %>% 
-#   filter(is.na(order)==T | order == "NA") %>%
-#   filter(family == "NA" | is.na(family)==T)
-# rm(coleop_check)
-
-# read in OTU data for Zeale primer set
-# zeale <- read_xlsx("data/zeale.fam.final.meta.xlsx", 
-#                    sheet ="Sheet1") %>%
-#   rename(final_ID = Identification) %>%
-#   left_join(famlookup, by = "final_ID") %>%
-#   select(kingdom, phylum, class, order, family, 
-#          final_lowest, final_ID, starts_with("sample")) %>%
-#   mutate(primer = "zeale") %>%
-#   select(primer, phylum, class, order, family, 
-#          final_lowest,
-#          final_ID, starts_with("sample")) %>%
-#   arrange(primer, phylum, class, order, family, final_ID)
-
-# check for missed arthropods in zeale dataset
-    # view this object and scan final_ID's with family == NA
-# zeale_check <- zeale %>% 
-#   filter(is.na(order)==T | order == "NA") %>%
-#   filter(family == "NA" | is.na(family)==T)
-# rm(zeale_check)
-
-# combine data sets
-# data_full <- zeale %>%
-#   bind_rows(coleop)
-
-# reads data just for arthropods
-# art_full <- data_full %>%
-#   filter(phylum == "Arthropoda") %>%
-#   group_by(primer, family) %>%
-#   mutate(otu_id = paste0(family,"_", primer, "_", 1:length(primer))) %>%
-#   ungroup() %>%
-#   mutate(lineage = paste0("r__Root (Arthropoda);c__", 
-#                           class, ";o__", order, ";f__", family),
-#          lineage_order = paste0("r__Root (Arthropoda);c__", 
-#                           class, ";o__", order))
-
 art_full <- cs3 %>%
   mutate(primer = "coleop") %>%
   bind_rows(mutate(zs3, primer = "zeale")) %>%
@@ -322,99 +265,6 @@ art_sp_reads <- art_full %>%
   pivot_wider(names_from = primer, values_from = starts_with("sample")) %>%
   select(sci, ends_with("coleop"), ends_with("zeale"))
 
-# # otu count by family for arthropods (both primers separate)
-# n_otus_primer.fam <- art_fam %>%
-#   select(primer, family, starts_with("sample")) %>%
-#   mutate(across(.cols = starts_with("sample"),
-#                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
-#   group_by(primer, family) %>%
-#   summarise(across(starts_with("sample"), sum),
-#             .groups = "drop") %>%
-#   select(-sample.sum)
-# 
-# n_otus_primer.gen <- art_gen %>%
-#   select(primer, genus, starts_with("sample")) %>%
-#   mutate(across(.cols = starts_with("sample"),
-#                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
-#   group_by(primer, genus) %>%
-#   summarise(across(starts_with("sample"), sum),
-#             .groups = "drop") %>%
-#   select(-sample.sum)
-# 
-# n_otus_primer.sp <- art_sp %>%
-#   select(primer, sci, starts_with("sample")) %>%
-#   mutate(across(.cols = starts_with("sample"),
-#                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
-#   group_by(primer, sci) %>%
-#   summarise(across(starts_with("sample"), sum),
-#             .groups = "drop") %>%
-#   select(-sample.sum)
-# 
-# # otu count by taxon group for arthropods (max of 2 primers)
-# n_otus_max.fam <- n_otus_primer.fam %>%
-#   group_by(family) %>%
-#   # max number of OTUs detected by either primer set
-#   summarise(across(starts_with("sample"), max))
-# 
-# n_otus_max.gen <- n_otus_primer.gen %>%
-#   group_by(genus) %>%
-#   # max number of OTUs detected by either primer set
-#   summarise(across(starts_with("sample"), max))
-# 
-# n_otus_max.sp <- n_otus_primer.sp %>%
-#   group_by(sci) %>%
-#   # max number of OTUs detected by either primer set
-#   summarise(across(starts_with("sample"), max))
-# 
-# # family presence/absence for arthropods (both primers combined)
-# pa_fam <- n_otus_max.fam %>%
-#   mutate(across(starts_with("sample"),
-#                 .fns = function(x) ifelse(x > 0,1,0)))
-# 
-# pa_gen <- n_otus_max.gen %>%
-#   mutate(across(starts_with("sample"),
-#                 .fns = function(x) ifelse(x > 0,1,0)))
-# 
-# pa_sp <- n_otus_max.sp %>%
-#   mutate(across(starts_with("sample"),
-#                 .fns = function(x) ifelse(x > 0,1,0)))
-# 
-# # separate family presence/absence into spray & roller matrices
-# pa_fam_s <- pa_fam %>%
-#   select(contains("DS"))
-#   select(contains("CS")[c(2:10,1)]) %>%
-#   as.matrix()
-# 
-# pa_fam_r <- pa_fam %>%
-#   select(contains("CR"), contains("DR")) %>%
-#   as.matrix()
-# 
-# pa_fam_array <- array(NA, dim = c(177, 20, 2))
-# pa_fam_array[,,1] <- pa_fam_s
-# pa_fam_array[,,2] <- pa_fam_r
-# pa_fam_both <- apply(pa_fam_array, c(1,2), max)
-# 
-# # make a data frame of prevalence of each family by method
-# pasum <- data.frame(
-#   lineage = pa_fam$lineage,
-#   spray.pa = apply(pa_fam_s, 1, mean),
-#   roll.pa = apply(pa_fam_r, 1, mean),
-#   both.pa = apply(pa_fam_both, 1, mean)) %>%
-#   arrange(desc(roll.pa)) %>%
-#   mutate(roll.rank = 1:length(roll.pa)) %>%
-#   arrange(desc(spray.pa)) %>%
-#   mutate(spray.rank = 1:length(spray.pa)) %>%
-#   mutate(whichdet = case_when(roll.pa > 0 & spray.pa > 0 ~ 0,
-#                               roll.pa > 0 & spray.pa == 0 ~ 1,
-#                               roll.pa == 0 & spray.pa > 0 ~ -1))
-# 
-# d_samples <- data.frame(sample_id = colnames(pa_fam)[2:41]) %>%
-#   mutate(Method = stringr::str_sub(sample_id, -1,-1),
-#          Tree = stringr::str_sub(sample_id, -2,-2),
-#          Samp = sample_id)
-# 
-# str_sub(d_samples$Samp, -1,-1) <- ""
-
 ```
 # Format data for accumulation curves
 ```{r}
@@ -425,7 +275,7 @@ sprayZ_motu_mat <- art_motu_reads %>%
   filter(grepl(id, pattern = "Z")) %>%
   select(contains("CS"), contains("DS")) %>%
   select(contains("zeale")) %>%
-  select(-sample.3CS_zeale) %>% # a sample with no reads for the Zeale primer
+  select(-sample.3CS_zeale) %>% # a sample with no sample for the Zeale primer
   t()
 sprayZ_motu_mat[is.na(sprayZ_motu_mat)] <- 0 
 sprayZ_motu_mat[sprayZ_motu_mat>0] <- 1 
@@ -681,404 +531,6 @@ sprayC_fam_mat2 <- rbind(sprayC_fam_mat[1:10,],
 bothC_fam_mat <- sprayC_fam_mat2 + rollC_fam_mat
 bothC_fam_mat[bothC_fam_mat>0] <- 1
 
-#### old way below here...
-
-# # construct accumulation curves
-# 
-# # calculate accumulation curves - spray - zeale - sp level
-# accum.sprayZ_sp <- accumcomp(sprayZ_sp_mat, 
-#                               y=data.frame(method = rep("spray", 
-#                                                         nrow(sprayZ_sp_mat))),
-#                               factor='method', 
-#                               method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.sprayZ_sp
-# 
-# # calculate accumulation curves - roller - zeale - sp level
-# accum.rollZ_sp <- accumcomp(rollZ_sp_mat, 
-#                              y=data.frame(method = rep("roll", 
-#                                                        nrow(rollZ_sp_mat))),
-#                              factor='method', 
-#                              method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.rollZ_sp
-# 
-# # calculate accumulation curves - both - zeale - sp level
-# accum.bothZ_sp <- accumcomp(bothZ_sp_mat, 
-#                              y=data.frame(method = rep("both", 
-#                                                        nrow(bothZ_sp_mat))),
-#                              factor='method', 
-#                              method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.bothZ_sp
-# 
-# # calculate accumulation curves - spray - coleop - sp level
-# accum.sprayC_sp <- accumcomp(sprayC_sp_mat, 
-#                               y=data.frame(method = rep("spray", 
-#                                                         nrow(sprayC_sp_mat))),
-#                               factor='method', 
-#                               method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.sprayC_sp
-# 
-# # calculate accumulation curves - roll - coleop - sp level
-# accum.rollC_sp<- accumcomp(rollC_sp_mat, 
-#                             y=data.frame(method = rep("roll", 
-#                                                       nrow(rollC_sp_mat))),
-#                             factor='method', 
-#                             method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.rollC_sp
-# 
-# # calculate accumulation curves - both - coleop - sp level
-# accum.bothC_sp <- accumcomp(bothC_sp_mat, 
-#                              y=data.frame(method = rep("both", 
-#                                                        nrow(bothC_sp_mat))),
-#                              factor='method', 
-#                              method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.bothC_sp
-# 
-# # calculate accumulation curves - spray - zeale - genus level
-# accum.sprayZ_gen <- accumcomp(sprayZ_gen_mat, 
-#                      y=data.frame(method = rep("spray", 
-#                                                nrow(sprayZ_gen_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.sprayZ_gen
-# 
-# # calculate accumulation curves - roller - zeale - genus level
-# accum.rollZ_gen <- accumcomp(rollZ_gen_mat, 
-#                      y=data.frame(method = rep("roll", 
-#                                                nrow(rollZ_gen_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.rollZ_gen
-# 
-# # calculate accumulation curves - both - zeale - genus level
-# accum.bothZ_gen <- accumcomp(bothZ_gen_mat, 
-#                      y=data.frame(method = rep("both", 
-#                                                nrow(bothZ_gen_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.bothZ_gen
-# 
-# # calculate accumulation curves - spray - coleop - genus level
-# accum.sprayC_gen <- accumcomp(sprayC_gen_mat, 
-#                      y=data.frame(method = rep("spray", 
-#                                                nrow(sprayC_gen_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.sprayC_gen
-# 
-# # calculate accumulation curves - roll - coleop - genus level
-# accum.rollC_gen<- accumcomp(rollC_gen_mat, 
-#                      y=data.frame(method = rep("roll", 
-#                                                nrow(rollC_gen_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.rollC_gen
-# 
-# # calculate accumulation curves - both - coleop - genus level
-# accum.bothC_gen <- accumcomp(bothC_gen_mat, 
-#                      y=data.frame(method = rep("both", 
-#                                                nrow(bothC_gen_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.bothC_gen
-# 
-# # calculate accumulation curves - spray - zeale - family level
-# accum.sprayZ_fam <- accumcomp(sprayZ_fam_mat, 
-#                      y=data.frame(method = rep("spray", 
-#                                                nrow(sprayZ_fam_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.sprayZ_fam
-# 
-# # calculate accumulation curves - roller - zeale - family level
-# accum.rollZ_fam <- accumcomp(rollZ_fam_mat, 
-#                      y=data.frame(method = rep("roll", 
-#                                                nrow(rollZ_fam_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.rollZ_fam
-# 
-# # calculate accumulation curves - both - zeale - family level
-# accum.bothZ_fam <- accumcomp(bothZ_fam_mat, 
-#                      y=data.frame(method = rep("both", 
-#                                                nrow(bothZ_fam_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.bothZ_fam
-# 
-# # calculate accumulation curves - spray - coleop - family level
-# accum.sprayC_fam <- accumcomp(sprayC_fam_mat, 
-#                      y=data.frame(method = rep("spray", 
-#                                                nrow(sprayC_fam_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.sprayC_fam
-# 
-# # calculate accumulation curves - roll - coleop - family level
-# accum.rollC_fam <- accumcomp(rollC_fam_mat, 
-#                      y=data.frame(method = rep("roll", 
-#                                                nrow(rollC_fam_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.rollC_fam
-# 
-# # calculate accumulation curves - both - coleop - family level
-# accum.bothC_fam <- accumcomp(bothC_fam_mat, 
-#                      y=data.frame(method = rep("both", 
-#                                                nrow(bothC_fam_mat))),
-#                      factor='method', 
-#   method='exact', conditioned=FALSE, plotit=FALSE)
-# accum.bothC_fam
-# 
-# # format data for plotting
-# 
-# # plot data - spray - zeale - sp level
-# plot.data.sprayZ_sp <- data.frame(samples = c(accum.sprayZ_sp[,,1]), 
-#                                    s = c(accum.sprayZ_sp[,,2]), 
-#                                    sd = c(accum.sprayZ_sp[,,3]),
-#                                    method = "Spray")
-# 
-# # plot data - roll - zeale - sp level
-# plot.data.rollZ_sp <- data.frame(samples = c(accum.rollZ_sp[,,1]), 
-#                                   s = c(accum.rollZ_sp[,,2]), 
-#                                   sd = c(accum.rollZ_sp[,,3]),
-#                                   method = "Roller")
-# 
-# # plot data - both - zeale - sp level
-# plot.data.bothZ_sp <- data.frame(samples = c(accum.bothZ_sp[,,1]), 
-#                                   s = c(accum.bothZ_sp[,,2]), 
-#                                   sd = c(accum.bothZ_sp[,,3]),
-#                                   method = "Both")
-# 
-# # combine plot data - zeale - sp level
-# plot.dataZ_sp <- plot.data.sprayZ_sp %>%
-#   bind_rows(plot.data.rollZ_sp) %>%
-#   bind_rows(plot.data.bothZ_sp)
-# 
-# # plot data - spray - coleop - sp level
-# plot.data.sprayC_sp <- data.frame(samples = c(accum.sprayC_sp[,,1]), 
-#                                    s = c(accum.sprayC_sp[,,2]), 
-#                                    sd = c(accum.sprayC_sp[,,3]),
-#                                    method = "Spray")
-# 
-# # plot data - roll - coleop - sp level
-# plot.data.rollC_sp <- data.frame(samples = c(accum.rollC_sp[,,1]), 
-#                                   s = c(accum.rollC_sp[,,2]), 
-#                                   sd = c(accum.rollC_sp[,,3]),
-#                                   method = "Roller")
-# 
-# # plot data - both - coleop - sp level
-# plot.data.bothC_sp <- data.frame(samples = c(accum.bothC_sp[,,1]), 
-#                                   s = c(accum.bothC_sp[,,2]), 
-#                                   sd = c(accum.bothC_sp[,,3]),
-#                                   method = "Both")
-# 
-# # combine plot data - coleop - sp level
-# plot.dataC_sp <- plot.data.sprayC_sp %>%
-#   bind_rows(plot.data.rollC_sp) %>%
-#   bind_rows(plot.data.bothC_sp)
-# 
-# # plot data - spray - zeale - genus level
-# plot.data.sprayZ_gen <- data.frame(samples = c(accum.sprayZ_gen[,,1]), 
-#                                    s = c(accum.sprayZ_gen[,,2]), 
-#                                    sd = c(accum.sprayZ_gen[,,3]),
-#                                    method = "Spray")
-# 
-# # plot data - roll - zeale - genus level
-# plot.data.rollZ_gen <- data.frame(samples = c(accum.rollZ_gen[,,1]), 
-#                                   s = c(accum.rollZ_gen[,,2]), 
-#                                   sd = c(accum.rollZ_gen[,,3]),
-#                                   method = "Roller")
-# 
-# # plot data - both - zeale - genus level
-# plot.data.bothZ_gen <- data.frame(samples = c(accum.bothZ_gen[,,1]), 
-#                                   s = c(accum.bothZ_gen[,,2]), 
-#                                   sd = c(accum.bothZ_gen[,,3]),
-#                                   method = "Both")
-# 
-# # combine plot data - zeale - genus level
-# plot.dataZ_gen <- plot.data.sprayZ_gen %>%
-#   bind_rows(plot.data.rollZ_gen) %>%
-#   bind_rows(plot.data.bothZ_gen)
-# 
-# # plot data - spray - coleop - genus level
-# plot.data.sprayC_gen <- data.frame(samples = c(accum.sprayC_gen[,,1]), 
-#                                    s = c(accum.sprayC_gen[,,2]), 
-#                                    sd = c(accum.sprayC_gen[,,3]),
-#                                    method = "Spray")
-# 
-# # plot data - roll - coleop - genus level
-# plot.data.rollC_gen <- data.frame(samples = c(accum.rollC_gen[,,1]), 
-#                                   s = c(accum.rollC_gen[,,2]), 
-#                                   sd = c(accum.rollC_gen[,,3]),
-#                                   method = "Roller")
-# 
-# # plot data - both - coleop - genus level
-# plot.data.bothC_gen <- data.frame(samples = c(accum.bothC_gen[,,1]), 
-#                                   s = c(accum.bothC_gen[,,2]), 
-#                                   sd = c(accum.bothC_gen[,,3]),
-#                                   method = "Both")
-# 
-# # combine plot data - coleop - genus level
-# plot.dataC_gen <- plot.data.sprayC_gen %>%
-#   bind_rows(plot.data.rollC_gen) %>%
-#   bind_rows(plot.data.bothC_gen)
-# 
-# # plot data - spray - zeale - family level
-# plot.data.sprayZ_fam <- data.frame(samples = c(accum.sprayZ_fam[,,1]), 
-#            s = c(accum.sprayZ_fam[,,2]), 
-#            sd = c(accum.sprayZ_fam[,,3]),
-#            method = "Spray")
-# 
-# # plot data - roll - zeale - family level
-# plot.data.rollZ_fam <- data.frame(samples = c(accum.rollZ_fam[,,1]), 
-#            s = c(accum.rollZ_fam[,,2]), 
-#            sd = c(accum.rollZ_fam[,,3]),
-#            method = "Roller")
-# 
-# # plot data - both - zeale - family level
-# plot.data.bothZ_fam <- data.frame(samples = c(accum.bothZ_fam[,,1]), 
-#            s = c(accum.bothZ_fam[,,2]), 
-#            sd = c(accum.bothZ_fam[,,3]),
-#            method = "Both")
-# 
-# # combine plot data - zeale - family level
-# plot.dataZ_fam <- plot.data.sprayZ_fam %>%
-#   bind_rows(plot.data.rollZ_fam) %>%
-#   bind_rows(plot.data.bothZ_fam)
-# 
-# # plot data - spray - coleop - family level
-# plot.data.sprayC_fam <- data.frame(samples = c(accum.sprayC_fam[,,1]), 
-#            s = c(accum.sprayC_fam[,,2]), 
-#            sd = c(accum.sprayC_fam[,,3]),
-#            method = "Spray")
-# 
-# # plot data - roll - coleop - family level
-# plot.data.rollC_fam <- data.frame(samples = c(accum.rollC_fam[,,1]), 
-#            s = c(accum.rollC_fam[,,2]), 
-#            sd = c(accum.rollC_fam[,,3]),
-#            method = "Roller")
-# 
-# # plot data - both - coleop - family level
-# plot.data.bothC_fam <- data.frame(samples = c(accum.bothC_fam[,,1]), 
-#            s = c(accum.bothC_fam[,,2]), 
-#            sd = c(accum.bothC_fam[,,3]),
-#            method = "Both")
-# 
-# # combine plot data - coleop - family level
-# plot.dataC_fam <- plot.data.sprayC_fam %>%
-#   bind_rows(plot.data.rollC_fam) %>%
-#   bind_rows(plot.data.bothC_fam)
-# 
-# # make plots
-# 
-# # Zeale - species level
-# ggplot(plot.dataZ_sp) +
-#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-#                   ymax = s+2*sd, fill = method),
-#               alpha = 0.5) +  
-#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-#   # geom_line(aes(x = samp, y = pred), data = pred) +
-#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-#   theme_bw() +
-#   theme(text = element_text(size = 14),
-#         legend.position = c(0.85, 0.25)) +
-#   labs(x = "No. samples", y = "No. species", fill = "")
-# 
-# ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
-#        dpi = 600, width = 6, height = 4)
-# 
-# # Coleop - species level
-# ggplot(plot.dataC_sp) +
-#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-#                   ymax = s+2*sd, fill = method),
-#               alpha = 0.5) +  
-#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-#   # geom_line(aes(x = samp, y = pred), data = pred) +
-#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-#   theme_bw() +
-#   theme(text = element_text(size = 14),
-#         legend.position = c(0.85, 0.25)) +
-#   labs(x = "No. samples", y = "No. genera", fill = "")
-# 
-# # Zeale - genus level
-# ggplot(plot.dataZ_gen) +
-#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-#                   ymax = s+2*sd, fill = method),
-#               alpha = 0.5) +  
-#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-#   # geom_line(aes(x = samp, y = pred), data = pred) +
-#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-#   theme_bw() +
-#   theme(text = element_text(size = 14),
-#         legend.position = c(0.85, 0.25)) +
-#   labs(x = "No. samples", y = "No. genera", fill = "")
-# 
-# 
-# ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
-#        dpi = 600, width = 6, height = 4)
-# 
-# # Coleop - genus level
-# ggplot(plot.dataC_gen) +
-#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-#                   ymax = s+2*sd, fill = method),
-#               alpha = 0.5) +  
-#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-#   # geom_line(aes(x = samp, y = pred), data = pred) +
-#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-#   theme_bw() +
-#   theme(text = element_text(size = 14),
-#         legend.position = c(0.85, 0.25)) +
-#   labs(x = "No. samples", y = "No. genera", fill = "")
-# 
-# # Zeale - family level
-# ggplot(plot.dataZ_fam) +
-#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-#                   ymax = s+2*sd, fill = method),
-#               alpha = 0.5) +  
-#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-#   # geom_line(aes(x = samp, y = pred), data = pred) +
-#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-#   theme_bw() +
-#   theme(text = element_text(size = 14),
-#         legend.position = c(0.85, 0.25)) +
-#   labs(x = "No. samples", y = "No. families", fill = "")
-# 
-# 
-# ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
-#        dpi = 600, width = 6, height = 4)
-# 
-# # Coleop - family level
-# ggplot(plot.dataC_fam) +
-#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-#                   ymax = s+2*sd, fill = method),
-#               alpha = 0.5) +  
-#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
-#   # geom_line(aes(x = samp, y = pred), data = pred) +
-#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-#   theme_bw() +
-#   theme(text = element_text(size = 14),
-#         legend.position = c(0.85, 0.25)) +
-#   labs(x = "No. samples", y = "No. families", fill = "")
-# 
-# ## Fit Lomolino model to the exact accumulation
-# mod1 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "lomolino"); AIC(mod1)
-# mod2 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "arrhenius"); AIC(mod2)
-# mod3 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gleason"); AIC(mod3)
-# mod4 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gitay"); AIC(mod4)
-# mod5 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "asymp"); AIC(mod5)
-# mod6 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gompertz"); AIC(mod6)
-# mod7 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "michaelis-menten"); AIC(mod7)
-# mod8 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "logis"); AIC(mod8)
-# mod9 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "weibull"); AIC(mod9)
-# # 
-# # coef(mod1)
-# # fitted(mod1)
-# # plot(both_mat)
-# # 
-# plot(mod9, add = F, col=2, lwd=2)
-# pred = data.frame(samp = 1:80,
-#                   pred = predict(mod9, newdata = data.frame(Sites = 1:80)))
-# pred
 ```
 # construct accumulation curves using iNEXT
 ```{r}
@@ -1174,41 +626,6 @@ ggsave("figures/rev1_accumcurves5.png", width = 12, height = 5, dpi = 400) # 3-p
 ggsave("figures/rev1_accumcurves10.png", width = 12, height = 10, dpi = 400) # 4-panel
 
 ```
-
-
-# specpool: Extrapolated Species Richness
-```{r}
-# format data matrices
-spray_mat <- pa_fam_s %>%
-  t()
-spray_mat[spray_mat>0] <- 1 
-
-# version of spray mat excluding the 3 "blank" samples (nb = no)
-spray_mat_nb <- pa_fam_s[,-c(11,13,19)] %>%
-  t()
-spray_mat_nb[spray_mat_nb>0] <- 1 
-
-roll_mat <- pa_fam_r %>%
-  t()
-roll_mat[roll_mat>0] <- 1 
-
-both_mat <- spray_mat + roll_mat
-both_mat[both_mat>0] <- 1 
-
-fitspecaccum(rollC_sp_mat, )
-specpool(bothZ_sp_mat)
-# Species     chao chao.se jack1 jack1.se    jack2     boot  boot.se  n
-# 126 162.1905 15.1504   164 10.22252 182.0947 143.7408 5.816372 20
-
-specpool(spray_mat_nb)
-# Species  chao  chao.se  jack1 jack1.se    jack2     boot  boot.se  n
-# 148 189.971 16.19735 192.65 13.10029 213.6342 168.3491 7.391802 20
-
-specpool(both_mat)
-# Species chao  chao.se  jack1 jack1.se    jack2     boot  boot.se  n
-# 177 213.1819 13.88307 221.65 12.73254 239.2237 198.2027 7.405305 20
-```
-
 # tally up families from primary and pilot study
 ```{r}
 # for now, read in dl from the 4methods Rmd
@@ -1232,83 +649,326 @@ just_old_sum_soil_water <- just_old_sum %>%
 dl_sum_water <- dl_sum %>% filter(Method == "Water")
 
 ```
-# NMDS Spray vs Roller, conifer vs. deciduous 
+# NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
 ```{r}
-# format data matrix
-mds_data <- rbind(t(pa_fam_r),
-                  t(pa_fam_s))
+# format data matrices
+mds.data.sp <- rbind(sprayZ_sp_mat,
+                  rollZ_sp_mat,
+                  sprayC_sp_mat,
+                  rollC_sp_mat)
+
+mds.data.gen <- rbind(sprayZ_gen_mat,
+                  rollZ_gen_mat,
+                  sprayC_gen_mat,
+                  rollC_gen_mat)
+
+mds.data.fam <- rbind(sprayZ_fam_mat,
+                  rollZ_fam_mat,
+                  sprayC_fam_mat,
+                  rollC_fam_mat)
+
+# check for blank rows
+apply(mds.data.sp, 1, max)
+apply(mds.data.gen, 1, max)
+apply(mds.data.fam, 1, max)
 
 # remove blank rows (no blanks)
-mds_data_nb <- mds_data[-which(rownames(mds_data) %in% 
-                                     c("sample1DS",
-                                       "sample3DS",
-                                       "sample9DS")),]
+  # these result from samples where no MOTUs were ID'd to this taxonomic level
+mds.data.sp.nb <- mds.data.sp[-which(rownames(mds.data.sp) %in% 
+                                     c("sample.9DR_zeale")),]
 
-# format covariate data
-env.data <- data.frame(tree = str_sub(rownames(mds_data_nb), 
+mds.data.gen.nb <- mds.data.gen[-which(rownames(mds.data.gen) %in% 
+                                     c("sample.9DR_zeale")),]
+
+mds.data.fam.nb <- mds.data.fam
+  
+# format covariate data - species level
+env.data <- data.frame(
+  tree = str_sub(gsub(gsub(rownames(mds.data.sp.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
                                       -2, -2),
-                       method = str_sub(rownames(mds_data_nb), 
+  method = str_sub(gsub(gsub(rownames(mds.data.sp.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
                                         -1, -1)) %>%
-  mutate(tree = case_when(tree == "C" ~ "Coniferous",
-                          tree == "D" ~ "Deciduous"),
-         method = case_when(method == "R" ~ "Roller",
-                            method == "S" ~ "Spray"))
+  mutate(tree = case_when(tree == "C" ~ "Conifer",
+                          tree == "D" ~ "Decid."),
+         method = case_when(method == "R" ~ "Bark",
+                            method == "S" ~ "Leaves"),
+  primer = case_when(grepl(rownames(mds.data.sp.nb), pattern = "zeal") ~ "COI",
+                     TRUE ~ "16S"))
 
 # package vegan NMDS
-set.seed(1)
-arthNMDS = metaMDS(mds_data_nb,
-                     k=2, distance = 'jaccard', trymax = 1000) 
+set.seed(110)
+arthNMDS.sp = metaMDS(mds.data.sp.nb,
+                     k=2, distance = 'jaccard', trymax = 10000) 
+saveRDS(arthNMDS.sp, "output/arthNMDS.sp.rds")
 
-plot1 <- ordiplot(arthNMDS, choices = c(1, 2))
+plot1 <- ordiplot(arthNMDS.sp, choices = c(1, 2))
 
 sites.long1 <-
   BiodiversityR::sites.long(plot1, env.data = env.data) %>%
   mutate(axis1 = as.numeric(axis1),
-         axis2 = as.numeric(axis2))
+         axis2 = as.numeric(axis2),
+         Method = paste0(method, " - ", tree, " (", primer, ")"))
 head(sites.long1)
 str(sites.long1)
 
 (
-plotf <- 
-ggplot(sites.long1) +
-  geom_vline(xintercept = c(0),
-             color = "grey70",
-             linetype = 2) +
-  geom_hline(yintercept = c(0),
-             color = "grey70",
-             linetype = 2) +     
-  scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
-  scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+  plot.sp <-
+    ggplot(sites.long1) +
+    geom_vline(
+      xintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    geom_hline(
+      yintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
     scale_color_manual(values = c("steelblue", "firebrick")) +
-  geom_point(aes(
-    x = axis1,
-    y = axis2,
-    color = method,
-    shape = tree
-  ),
-  size = 5,
-  alpha = 0.85) +
-  coord_fixed(ratio = 1) +
-  labs(y = "NMDS2", x = "NMDS1",
-       color = "Method", shape = "Tree type") +
-  theme_bw() +
-  theme(text = element_text(size = 14))
+    scale_shape_manual(values = c(17, 16)) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2,
+        shape = tree,
+        color = method
+      ),
+      size = 3,
+      alpha = 0.85
+    ) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2
+      ),
+      size = .75,
+      #alpha = 0.85,
+      color = "black",
+      data = filter(sites.long1, primer == "COI")
+    ) +
+    coord_fixed(ratio = 1) +
+    labs(
+      y = "NMDS2",
+      x = "NMDS1",
+      color = "Substrate",
+      shape = "Tree type"
+    ) +
+    theme_bw() +
+    theme(text = element_text(size = 12)) +
+    ggtitle("Species") +
+    guides(shape = "none", color = "none")
 )
 
-ggsave("figures/PlotF_NMDS_by_method_and_tree_type2.jpg",
+ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
        dpi = 600, width = 6, height = 6)
 
 
 # Test for differences among Method and Tree type
 # PERMANOVA
 set.seed(12555)
-perm_arth <- adonis(mds_data_nb ~ method + tree, data = env.data, 
+perm_arth <- adonis2(mds.data.sp.nb ~ primer + method + tree, data = env.data, 
        permutations = 9999, method = "jaccard",
        strata = NULL, contr.unordered = "contr.sum",
        contr.ordered = "contr.poly")
 
 perm_arth
+
+### genus level ###
+
+# format covariate data - species level
+ # (can use same data as for the species level)
+
+# package vegan NMDS
+set.seed(110)
+arthNMDS.gen = metaMDS(mds.data.gen.nb,
+                     k=2, distance = 'jaccard', trymax = 10000) 
+saveRDS(arthNMDS.gen, "output/arthNMDS.gen.rds")
+
+plot1.gen <- ordiplot(arthNMDS.gen, choices = c(1, 2))
+
+sites.long1.gen <-
+  BiodiversityR::sites.long(plot1.gen, env.data = env.data) %>%
+  mutate(axis1 = as.numeric(axis1),
+         axis2 = as.numeric(axis2),
+         Method = paste0(method, " - ", tree, " (", primer, ")"))
+head(sites.long1)
+str(sites.long1)
+
+(
+  plot.gen <-
+    ggplot(sites.long1.gen) +
+    geom_vline(
+      xintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    geom_hline(
+      yintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_color_manual(values = c("steelblue", "firebrick")) +
+    scale_shape_manual(values = c(17, 16)) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2,
+        shape = tree,
+        color = method
+      ),
+      size = 3,
+      alpha = 0.85
+    ) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2
+      ),
+      size = .75,
+      #alpha = 0.85,
+      color = "black",
+      data = filter(sites.long1.gen, primer == "COI")
+    ) +
+    coord_fixed(ratio = 1) +
+    labs(
+      y = "NMDS2",
+      x = "NMDS1",
+      color = "Substrate",
+      shape = "Tree type"
+    ) +
+    theme_bw() +
+    theme(text = element_text(size = 12)) +
+    ggtitle("Genus") +
+    guides(shape = "none", color = "none")
+)
+
+ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
+       dpi = 600, width = 6, height = 6)
+
+
+# Test for differences among Method and Tree type (genus level)
+# PERMANOVA
+set.seed(12555)
+perm_arth.gen <- adonis2(mds.data.gen.nb ~ primer + method + tree, data = env.data, 
+       permutations = 9999, method = "jaccard",
+       strata = NULL, contr.unordered = "contr.sum",
+       contr.ordered = "contr.poly")
+
+perm_arth.gen
+
+### family level ###
+
+# format covariate data - family level
+env.data.fam <- data.frame(
+  tree = str_sub(gsub(gsub(rownames(mds.data.fam.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                      -2, -2),
+  method = str_sub(gsub(gsub(rownames(mds.data.fam.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                        -1, -1)) %>%
+  mutate(tree = case_when(tree == "C" ~ "Conifer",
+                          tree == "D" ~ "Decid."),
+         method = case_when(method == "R" ~ "Bark",
+                            method == "S" ~ "Leaves"),
+  primer = case_when(grepl(rownames(mds.data.fam.nb), pattern = "zeal") ~ "COI",
+                     TRUE ~ "16S"))
+
+# package vegan NMDS
+set.seed(110)
+arthNMDS.fam = metaMDS(mds.data.fam.nb,
+                     k=2, distance = 'jaccard', trymax = 10000) 
+saveRDS(arthNMDS.fam, "output/arthNMDS.fam.rds")
+
+plot1.fam <- ordiplot(arthNMDS.fam, choices = c(1, 2))
+
+sites.long1.fam <-
+  BiodiversityR::sites.long(plot1.fam, env.data = env.data.fam) %>%
+  mutate(axis1 = as.numeric(axis1),
+         axis2 = as.numeric(axis2),
+         Method = paste0(method, " - ", tree, " (", primer, ")"))
+head(sites.long1.fam)
+str(sites.long1.fam)
+
+(
+  plot.fam <-
+    ggplot(sites.long1.fam) +
+    geom_vline(
+      xintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    geom_hline(
+      yintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_color_manual(values = c("steelblue", "firebrick")) +
+    scale_shape_manual(values = c(17, 16)) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2,
+        shape = tree,
+        color = method
+      ),
+      size = 3,
+      alpha = 0.85
+    ) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2
+      ),
+      size = .75,
+      #alpha = 0.85,
+      color = "black",
+      data = filter(sites.long1.fam, primer == "COI")
+    ) +
+    coord_fixed(ratio = 1) +
+    labs(
+      y = "NMDS2",
+      x = "NMDS1",
+      color = "Substrate",
+      shape = "Tree type"
+    ) +
+    theme_bw() +
+    theme(text = element_text(size = 12)) +
+    ggtitle("Family") +
+    guides(shape = "none", color = "none")
+)
+
+ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
+       dpi = 600, width = 6, height = 6)
+
+
+# Test for differences among Method and Tree type
+# PERMANOVA
+set.seed(12555)
+perm_arth.fam <- adonis2(mds.data.fam.nb ~ primer + method + tree, data = env.data.fam, 
+       permutations = 9999, method = "jaccard",
+       strata = NULL, contr.unordered = "contr.sum",
+       contr.ordered = "contr.poly")
+
+perm_arth.fam
+
+plot.sp + plot.gen + plot.fam
+ggsave("figures/rev2_nmds_all4.png", width = 9, height = 3, dpi = 400)
 ```
+
+
+
 # Feeding guild - fine scale
 ```{r}
 feed_step1 <- diet %>%
