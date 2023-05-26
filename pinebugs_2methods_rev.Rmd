@@ -14,6 +14,7 @@ library(BiodiversityR)
 # library(wesanderson)
 # library(patchwork)
 library(tidyr)
+library(iNEXT)
 # library(forcats)
 select <- dplyr::select
 # path for taxonomy and ecology lookup tables
@@ -257,6 +258,12 @@ lineage_lookup <- art_full %>%
   dplyr::select(phylum, class, order, family, genus, sci) %>%
   distinct()
 
+# format MOTU database for use in sp accum 
+art_motu_reads <- art_full %>%
+  select(primer, id, starts_with("sample")) %>%
+  pivot_wider(names_from = primer, values_from = starts_with("sample")) %>%
+  select(id, ends_with("coleop"), ends_with("zeale"))
+
 # subset databases that summarize by order, family, genera, species-level IDs
 art_order_reads <- art_full %>%
   filter(order != "NA" & is.na(order)==F) %>%
@@ -315,105 +322,172 @@ art_sp_reads <- art_full %>%
   pivot_wider(names_from = primer, values_from = starts_with("sample")) %>%
   select(sci, ends_with("coleop"), ends_with("zeale"))
 
-# otu count by family for arthropods (both primers separate)
-n_otus_primer.fam <- art_fam %>%
-  select(primer, family, starts_with("sample")) %>%
-  mutate(across(.cols = starts_with("sample"),
-                .fns = function(x) ifelse(x > 0, 1, 0))) %>%
-  group_by(primer, family) %>%
-  summarise(across(starts_with("sample"), sum),
-            .groups = "drop") %>%
-  select(-sample.sum)
-
-n_otus_primer.gen <- art_gen %>%
-  select(primer, genus, starts_with("sample")) %>%
-  mutate(across(.cols = starts_with("sample"),
-                .fns = function(x) ifelse(x > 0, 1, 0))) %>%
-  group_by(primer, genus) %>%
-  summarise(across(starts_with("sample"), sum),
-            .groups = "drop") %>%
-  select(-sample.sum)
-
-n_otus_primer.sp <- art_sp %>%
-  select(primer, sci, starts_with("sample")) %>%
-  mutate(across(.cols = starts_with("sample"),
-                .fns = function(x) ifelse(x > 0, 1, 0))) %>%
-  group_by(primer, sci) %>%
-  summarise(across(starts_with("sample"), sum),
-            .groups = "drop") %>%
-  select(-sample.sum)
-
-# otu count by taxon group for arthropods (max of 2 primers)
-n_otus_max.fam <- n_otus_primer.fam %>%
-  group_by(family) %>%
-  # max number of OTUs detected by either primer set
-  summarise(across(starts_with("sample"), max))
-
-n_otus_max.gen <- n_otus_primer.gen %>%
-  group_by(genus) %>%
-  # max number of OTUs detected by either primer set
-  summarise(across(starts_with("sample"), max))
-
-n_otus_max.sp <- n_otus_primer.sp %>%
-  group_by(sci) %>%
-  # max number of OTUs detected by either primer set
-  summarise(across(starts_with("sample"), max))
-
-# family presence/absence for arthropods (both primers combined)
-pa_fam <- n_otus_max.fam %>%
-  mutate(across(starts_with("sample"),
-                .fns = function(x) ifelse(x > 0,1,0)))
-
-pa_gen <- n_otus_max.gen %>%
-  mutate(across(starts_with("sample"),
-                .fns = function(x) ifelse(x > 0,1,0)))
-
-pa_sp <- n_otus_max.sp %>%
-  mutate(across(starts_with("sample"),
-                .fns = function(x) ifelse(x > 0,1,0)))
-
-# separate family presence/absence into spray & roller matrices
-pa_fam_s <- pa_fam %>%
-  select(contains("DS"))
-  select(contains("CS")[c(2:10,1)]) %>%
-  as.matrix()
-
-pa_fam_r <- pa_fam %>%
-  select(contains("CR"), contains("DR")) %>%
-  as.matrix()
-
-pa_fam_array <- array(NA, dim = c(177, 20, 2))
-pa_fam_array[,,1] <- pa_fam_s
-pa_fam_array[,,2] <- pa_fam_r
-pa_fam_both <- apply(pa_fam_array, c(1,2), max)
-
-# make a data frame of prevalence of each family by method
-pasum <- data.frame(
-  lineage = pa_fam$lineage,
-  spray.pa = apply(pa_fam_s, 1, mean),
-  roll.pa = apply(pa_fam_r, 1, mean),
-  both.pa = apply(pa_fam_both, 1, mean)) %>%
-  arrange(desc(roll.pa)) %>%
-  mutate(roll.rank = 1:length(roll.pa)) %>%
-  arrange(desc(spray.pa)) %>%
-  mutate(spray.rank = 1:length(spray.pa)) %>%
-  mutate(whichdet = case_when(roll.pa > 0 & spray.pa > 0 ~ 0,
-                              roll.pa > 0 & spray.pa == 0 ~ 1,
-                              roll.pa == 0 & spray.pa > 0 ~ -1))
-
-d_samples <- data.frame(sample_id = colnames(pa_fam)[2:41]) %>%
-  mutate(Method = stringr::str_sub(sample_id, -1,-1),
-         Tree = stringr::str_sub(sample_id, -2,-2),
-         Samp = sample_id)
-
-str_sub(d_samples$Samp, -1,-1) <- ""
+# # otu count by family for arthropods (both primers separate)
+# n_otus_primer.fam <- art_fam %>%
+#   select(primer, family, starts_with("sample")) %>%
+#   mutate(across(.cols = starts_with("sample"),
+#                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
+#   group_by(primer, family) %>%
+#   summarise(across(starts_with("sample"), sum),
+#             .groups = "drop") %>%
+#   select(-sample.sum)
+# 
+# n_otus_primer.gen <- art_gen %>%
+#   select(primer, genus, starts_with("sample")) %>%
+#   mutate(across(.cols = starts_with("sample"),
+#                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
+#   group_by(primer, genus) %>%
+#   summarise(across(starts_with("sample"), sum),
+#             .groups = "drop") %>%
+#   select(-sample.sum)
+# 
+# n_otus_primer.sp <- art_sp %>%
+#   select(primer, sci, starts_with("sample")) %>%
+#   mutate(across(.cols = starts_with("sample"),
+#                 .fns = function(x) ifelse(x > 0, 1, 0))) %>%
+#   group_by(primer, sci) %>%
+#   summarise(across(starts_with("sample"), sum),
+#             .groups = "drop") %>%
+#   select(-sample.sum)
+# 
+# # otu count by taxon group for arthropods (max of 2 primers)
+# n_otus_max.fam <- n_otus_primer.fam %>%
+#   group_by(family) %>%
+#   # max number of OTUs detected by either primer set
+#   summarise(across(starts_with("sample"), max))
+# 
+# n_otus_max.gen <- n_otus_primer.gen %>%
+#   group_by(genus) %>%
+#   # max number of OTUs detected by either primer set
+#   summarise(across(starts_with("sample"), max))
+# 
+# n_otus_max.sp <- n_otus_primer.sp %>%
+#   group_by(sci) %>%
+#   # max number of OTUs detected by either primer set
+#   summarise(across(starts_with("sample"), max))
+# 
+# # family presence/absence for arthropods (both primers combined)
+# pa_fam <- n_otus_max.fam %>%
+#   mutate(across(starts_with("sample"),
+#                 .fns = function(x) ifelse(x > 0,1,0)))
+# 
+# pa_gen <- n_otus_max.gen %>%
+#   mutate(across(starts_with("sample"),
+#                 .fns = function(x) ifelse(x > 0,1,0)))
+# 
+# pa_sp <- n_otus_max.sp %>%
+#   mutate(across(starts_with("sample"),
+#                 .fns = function(x) ifelse(x > 0,1,0)))
+# 
+# # separate family presence/absence into spray & roller matrices
+# pa_fam_s <- pa_fam %>%
+#   select(contains("DS"))
+#   select(contains("CS")[c(2:10,1)]) %>%
+#   as.matrix()
+# 
+# pa_fam_r <- pa_fam %>%
+#   select(contains("CR"), contains("DR")) %>%
+#   as.matrix()
+# 
+# pa_fam_array <- array(NA, dim = c(177, 20, 2))
+# pa_fam_array[,,1] <- pa_fam_s
+# pa_fam_array[,,2] <- pa_fam_r
+# pa_fam_both <- apply(pa_fam_array, c(1,2), max)
+# 
+# # make a data frame of prevalence of each family by method
+# pasum <- data.frame(
+#   lineage = pa_fam$lineage,
+#   spray.pa = apply(pa_fam_s, 1, mean),
+#   roll.pa = apply(pa_fam_r, 1, mean),
+#   both.pa = apply(pa_fam_both, 1, mean)) %>%
+#   arrange(desc(roll.pa)) %>%
+#   mutate(roll.rank = 1:length(roll.pa)) %>%
+#   arrange(desc(spray.pa)) %>%
+#   mutate(spray.rank = 1:length(spray.pa)) %>%
+#   mutate(whichdet = case_when(roll.pa > 0 & spray.pa > 0 ~ 0,
+#                               roll.pa > 0 & spray.pa == 0 ~ 1,
+#                               roll.pa == 0 & spray.pa > 0 ~ -1))
+# 
+# d_samples <- data.frame(sample_id = colnames(pa_fam)[2:41]) %>%
+#   mutate(Method = stringr::str_sub(sample_id, -1,-1),
+#          Tree = stringr::str_sub(sample_id, -2,-2),
+#          Samp = sample_id)
+# 
+# str_sub(d_samples$Samp, -1,-1) <- ""
 
 ```
-# Accumulation curves
-used code from here: https://rpubs.com/Roeland-KINDT/694021
-and: http://biological-complexity.blogspot.com/2018/01/on-species-accumulation-curves.html
+# Format data for accumulation curves
 ```{r}
 # format data matrices
+
+# spray samples - zeale - motu level
+sprayZ_motu_mat <- art_motu_reads %>%
+  filter(grepl(id, pattern = "Z")) %>%
+  select(contains("CS"), contains("DS")) %>%
+  select(contains("zeale")) %>%
+  select(-sample.3CS_zeale) %>% # a sample with no reads for the Zeale primer
+  t()
+sprayZ_motu_mat[is.na(sprayZ_motu_mat)] <- 0 
+sprayZ_motu_mat[sprayZ_motu_mat>0] <- 1 
+colnames(sprayZ_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "Z"))$id
+
+# roller samples - zeale - motu level
+rollZ_motu_mat <- art_motu_reads %>%
+  filter(grepl(id, pattern = "Z")) %>%
+  select(contains("CR"), contains("DR")) %>%
+  select(contains("zeale")) %>%
+  t()
+rollZ_motu_mat[is.na(rollZ_motu_mat)] <- 0 
+rollZ_motu_mat[rollZ_motu_mat>0] <- 1 
+colnames(rollZ_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "Z"))$id
+
+# both - zeale - sp level
+zeromat.motu.Z <- matrix(0,1,421)
+sprayZ_motu_mat2 <- rbind(sprayZ_motu_mat[1:2,],
+                         zeromat.motu.Z,
+                         sprayZ_motu_mat[3:9,],
+                         zeromat.motu.Z,
+                         sprayZ_motu_mat[10,],
+                         zeromat.motu.Z,
+                         sprayZ_motu_mat[11:15,],
+                         zeromat.motu.Z,
+                         sprayZ_motu_mat[16,])
+
+bothZ_motu_mat <- sprayZ_motu_mat2 + rollZ_motu_mat
+bothZ_motu_mat[bothZ_motu_mat>0] <- 1
+
+# spray samples - coleop - motu level
+sprayC_motu_mat <- art_motu_reads %>%
+  filter(grepl(id, pattern = "C")) %>%
+  select(contains("CS"), contains("DS")) %>%
+  select(contains("coleop")) %>%
+  t()
+sprayC_motu_mat[is.na(sprayC_motu_mat)] <- 0 
+sprayC_motu_mat[sprayC_motu_mat>0] <- 1 
+colnames(sprayC_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "C"))$id
+
+# roller samples - coleop - motu level
+rollC_motu_mat <- art_motu_reads %>%
+  filter(grepl(id, pattern = "C")) %>%
+  select(contains("CR"), contains("DR")) %>%
+  select(contains("coleop")) %>%
+  t()
+rollC_motu_mat[is.na(rollC_motu_mat)] <- 0 
+rollC_motu_mat[rollC_motu_mat>0] <- 1 
+colnames(rollC_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "C"))$id
+
+# both - coleop - motu level
+zeromat.motu.C <- matrix(0,1,656)
+sprayC_motu_mat2 <- rbind(sprayC_motu_mat[1:10,],
+                         zeromat.motu.C,
+                         sprayC_motu_mat[11,],
+                         zeromat.motu.C,
+                         sprayC_motu_mat[12:16,],
+                         zeromat.motu.C,
+                         sprayC_motu_mat[17,])
+
+bothC_motu_mat <- sprayC_motu_mat2 + rollC_motu_mat
+bothC_motu_mat[bothC_motu_mat>0] <- 1
 
 # spray samples - zeale - sp level
 sprayZ_sp_mat <- art_sp_reads %>%
@@ -607,429 +681,440 @@ sprayC_fam_mat2 <- rbind(sprayC_fam_mat[1:10,],
 bothC_fam_mat <- sprayC_fam_mat2 + rollC_fam_mat
 bothC_fam_mat[bothC_fam_mat>0] <- 1
 
-# construct accumulation curves
+#### old way below here...
 
-# calculate accumulation curves - spray - zeale - sp level
-accum.sprayZ_sp <- accumcomp(sprayZ_sp_mat, 
-                              y=data.frame(method = rep("spray", 
-                                                        nrow(sprayZ_sp_mat))),
-                              factor='method', 
-                              method='exact', conditioned=FALSE, plotit=FALSE)
-accum.sprayZ_sp
-
-# calculate accumulation curves - roller - zeale - sp level
-accum.rollZ_sp <- accumcomp(rollZ_sp_mat, 
-                             y=data.frame(method = rep("roll", 
-                                                       nrow(rollZ_sp_mat))),
-                             factor='method', 
-                             method='exact', conditioned=FALSE, plotit=FALSE)
-accum.rollZ_sp
-
-# calculate accumulation curves - both - zeale - sp level
-accum.bothZ_sp <- accumcomp(bothZ_sp_mat, 
-                             y=data.frame(method = rep("both", 
-                                                       nrow(bothZ_sp_mat))),
-                             factor='method', 
-                             method='exact', conditioned=FALSE, plotit=FALSE)
-accum.bothZ_sp
-
-# calculate accumulation curves - spray - coleop - sp level
-accum.sprayC_sp <- accumcomp(sprayC_sp_mat, 
-                              y=data.frame(method = rep("spray", 
-                                                        nrow(sprayC_sp_mat))),
-                              factor='method', 
-                              method='exact', conditioned=FALSE, plotit=FALSE)
-accum.sprayC_sp
-
-# calculate accumulation curves - roll - coleop - sp level
-accum.rollC_sp<- accumcomp(rollC_sp_mat, 
-                            y=data.frame(method = rep("roll", 
-                                                      nrow(rollC_sp_mat))),
-                            factor='method', 
-                            method='exact', conditioned=FALSE, plotit=FALSE)
-accum.rollC_sp
-
-# calculate accumulation curves - both - coleop - sp level
-accum.bothC_sp <- accumcomp(bothC_sp_mat, 
-                             y=data.frame(method = rep("both", 
-                                                       nrow(bothC_sp_mat))),
-                             factor='method', 
-                             method='exact', conditioned=FALSE, plotit=FALSE)
-accum.bothC_sp
-
-# calculate accumulation curves - spray - zeale - genus level
-accum.sprayZ_gen <- accumcomp(sprayZ_gen_mat, 
-                     y=data.frame(method = rep("spray", 
-                                               nrow(sprayZ_gen_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.sprayZ_gen
-
-# calculate accumulation curves - roller - zeale - genus level
-accum.rollZ_gen <- accumcomp(rollZ_gen_mat, 
-                     y=data.frame(method = rep("roll", 
-                                               nrow(rollZ_gen_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.rollZ_gen
-
-# calculate accumulation curves - both - zeale - genus level
-accum.bothZ_gen <- accumcomp(bothZ_gen_mat, 
-                     y=data.frame(method = rep("both", 
-                                               nrow(bothZ_gen_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.bothZ_gen
-
-# calculate accumulation curves - spray - coleop - genus level
-accum.sprayC_gen <- accumcomp(sprayC_gen_mat, 
-                     y=data.frame(method = rep("spray", 
-                                               nrow(sprayC_gen_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.sprayC_gen
-
-# calculate accumulation curves - roll - coleop - genus level
-accum.rollC_gen<- accumcomp(rollC_gen_mat, 
-                     y=data.frame(method = rep("roll", 
-                                               nrow(rollC_gen_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.rollC_gen
-
-# calculate accumulation curves - both - coleop - genus level
-accum.bothC_gen <- accumcomp(bothC_gen_mat, 
-                     y=data.frame(method = rep("both", 
-                                               nrow(bothC_gen_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.bothC_gen
-
-# calculate accumulation curves - spray - zeale - family level
-accum.sprayZ_fam <- accumcomp(sprayZ_fam_mat, 
-                     y=data.frame(method = rep("spray", 
-                                               nrow(sprayZ_fam_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.sprayZ_fam
-
-# calculate accumulation curves - roller - zeale - family level
-accum.rollZ_fam <- accumcomp(rollZ_fam_mat, 
-                     y=data.frame(method = rep("roll", 
-                                               nrow(rollZ_fam_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.rollZ_fam
-
-# calculate accumulation curves - both - zeale - family level
-accum.bothZ_fam <- accumcomp(bothZ_fam_mat, 
-                     y=data.frame(method = rep("both", 
-                                               nrow(bothZ_fam_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.bothZ_fam
-
-# calculate accumulation curves - spray - coleop - family level
-accum.sprayC_fam <- accumcomp(sprayC_fam_mat, 
-                     y=data.frame(method = rep("spray", 
-                                               nrow(sprayC_fam_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.sprayC_fam
-
-# calculate accumulation curves - roll - coleop - family level
-accum.rollC_fam <- accumcomp(rollC_fam_mat, 
-                     y=data.frame(method = rep("roll", 
-                                               nrow(rollC_fam_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.rollC_fam
-
-# calculate accumulation curves - both - coleop - family level
-accum.bothC_fam <- accumcomp(bothC_fam_mat, 
-                     y=data.frame(method = rep("both", 
-                                               nrow(bothC_fam_mat))),
-                     factor='method', 
-  method='exact', conditioned=FALSE, plotit=FALSE)
-accum.bothC_fam
-
-# format data for plotting
-
-# plot data - spray - zeale - sp level
-plot.data.sprayZ_sp <- data.frame(samples = c(accum.sprayZ_sp[,,1]), 
-                                   s = c(accum.sprayZ_sp[,,2]), 
-                                   sd = c(accum.sprayZ_sp[,,3]),
-                                   method = "Spray")
-
-# plot data - roll - zeale - sp level
-plot.data.rollZ_sp <- data.frame(samples = c(accum.rollZ_sp[,,1]), 
-                                  s = c(accum.rollZ_sp[,,2]), 
-                                  sd = c(accum.rollZ_sp[,,3]),
-                                  method = "Roller")
-
-# plot data - both - zeale - sp level
-plot.data.bothZ_sp <- data.frame(samples = c(accum.bothZ_sp[,,1]), 
-                                  s = c(accum.bothZ_sp[,,2]), 
-                                  sd = c(accum.bothZ_sp[,,3]),
-                                  method = "Both")
-
-# combine plot data - zeale - sp level
-plot.dataZ_sp <- plot.data.sprayZ_sp %>%
-  bind_rows(plot.data.rollZ_sp) %>%
-  bind_rows(plot.data.bothZ_sp)
-
-# plot data - spray - coleop - sp level
-plot.data.sprayC_sp <- data.frame(samples = c(accum.sprayC_sp[,,1]), 
-                                   s = c(accum.sprayC_sp[,,2]), 
-                                   sd = c(accum.sprayC_sp[,,3]),
-                                   method = "Spray")
-
-# plot data - roll - coleop - sp level
-plot.data.rollC_sp <- data.frame(samples = c(accum.rollC_sp[,,1]), 
-                                  s = c(accum.rollC_sp[,,2]), 
-                                  sd = c(accum.rollC_sp[,,3]),
-                                  method = "Roller")
-
-# plot data - both - coleop - sp level
-plot.data.bothC_sp <- data.frame(samples = c(accum.bothC_sp[,,1]), 
-                                  s = c(accum.bothC_sp[,,2]), 
-                                  sd = c(accum.bothC_sp[,,3]),
-                                  method = "Both")
-
-# combine plot data - coleop - sp level
-plot.dataC_sp <- plot.data.sprayC_sp %>%
-  bind_rows(plot.data.rollC_sp) %>%
-  bind_rows(plot.data.bothC_sp)
-
-# plot data - spray - zeale - genus level
-plot.data.sprayZ_gen <- data.frame(samples = c(accum.sprayZ_gen[,,1]), 
-                                   s = c(accum.sprayZ_gen[,,2]), 
-                                   sd = c(accum.sprayZ_gen[,,3]),
-                                   method = "Spray")
-
-# plot data - roll - zeale - genus level
-plot.data.rollZ_gen <- data.frame(samples = c(accum.rollZ_gen[,,1]), 
-                                  s = c(accum.rollZ_gen[,,2]), 
-                                  sd = c(accum.rollZ_gen[,,3]),
-                                  method = "Roller")
-
-# plot data - both - zeale - genus level
-plot.data.bothZ_gen <- data.frame(samples = c(accum.bothZ_gen[,,1]), 
-                                  s = c(accum.bothZ_gen[,,2]), 
-                                  sd = c(accum.bothZ_gen[,,3]),
-                                  method = "Both")
-
-# combine plot data - zeale - genus level
-plot.dataZ_gen <- plot.data.sprayZ_gen %>%
-  bind_rows(plot.data.rollZ_gen) %>%
-  bind_rows(plot.data.bothZ_gen)
-
-# plot data - spray - coleop - genus level
-plot.data.sprayC_gen <- data.frame(samples = c(accum.sprayC_gen[,,1]), 
-                                   s = c(accum.sprayC_gen[,,2]), 
-                                   sd = c(accum.sprayC_gen[,,3]),
-                                   method = "Spray")
-
-# plot data - roll - coleop - genus level
-plot.data.rollC_gen <- data.frame(samples = c(accum.rollC_gen[,,1]), 
-                                  s = c(accum.rollC_gen[,,2]), 
-                                  sd = c(accum.rollC_gen[,,3]),
-                                  method = "Roller")
-
-# plot data - both - coleop - genus level
-plot.data.bothC_gen <- data.frame(samples = c(accum.bothC_gen[,,1]), 
-                                  s = c(accum.bothC_gen[,,2]), 
-                                  sd = c(accum.bothC_gen[,,3]),
-                                  method = "Both")
-
-# combine plot data - coleop - genus level
-plot.dataC_gen <- plot.data.sprayC_gen %>%
-  bind_rows(plot.data.rollC_gen) %>%
-  bind_rows(plot.data.bothC_gen)
-
-# plot data - spray - zeale - family level
-plot.data.sprayZ_fam <- data.frame(samples = c(accum.sprayZ_fam[,,1]), 
-           s = c(accum.sprayZ_fam[,,2]), 
-           sd = c(accum.sprayZ_fam[,,3]),
-           method = "Spray")
-
-# plot data - roll - zeale - family level
-plot.data.rollZ_fam <- data.frame(samples = c(accum.rollZ_fam[,,1]), 
-           s = c(accum.rollZ_fam[,,2]), 
-           sd = c(accum.rollZ_fam[,,3]),
-           method = "Roller")
-
-# plot data - both - zeale - family level
-plot.data.bothZ_fam <- data.frame(samples = c(accum.bothZ_fam[,,1]), 
-           s = c(accum.bothZ_fam[,,2]), 
-           sd = c(accum.bothZ_fam[,,3]),
-           method = "Both")
-
-# combine plot data - zeale - family level
-plot.dataZ_fam <- plot.data.sprayZ_fam %>%
-  bind_rows(plot.data.rollZ_fam) %>%
-  bind_rows(plot.data.bothZ_fam)
-
-# plot data - spray - coleop - family level
-plot.data.sprayC_fam <- data.frame(samples = c(accum.sprayC_fam[,,1]), 
-           s = c(accum.sprayC_fam[,,2]), 
-           sd = c(accum.sprayC_fam[,,3]),
-           method = "Spray")
-
-# plot data - roll - coleop - family level
-plot.data.rollC_fam <- data.frame(samples = c(accum.rollC_fam[,,1]), 
-           s = c(accum.rollC_fam[,,2]), 
-           sd = c(accum.rollC_fam[,,3]),
-           method = "Roller")
-
-# plot data - both - coleop - family level
-plot.data.bothC_fam <- data.frame(samples = c(accum.bothC_fam[,,1]), 
-           s = c(accum.bothC_fam[,,2]), 
-           sd = c(accum.bothC_fam[,,3]),
-           method = "Both")
-
-# combine plot data - coleop - family level
-plot.dataC_fam <- plot.data.sprayC_fam %>%
-  bind_rows(plot.data.rollC_fam) %>%
-  bind_rows(plot.data.bothC_fam)
-
-# make plots
-
-# Zeale - species level
-ggplot(plot.dataZ_sp) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  # geom_line(aes(x = samp, y = pred), data = pred) +
-  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.25)) +
-  labs(x = "No. samples", y = "No. species", fill = "")
-
-ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
-       dpi = 600, width = 6, height = 4)
-
-# Coleop - species level
-ggplot(plot.dataC_sp) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  # geom_line(aes(x = samp, y = pred), data = pred) +
-  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.25)) +
-  labs(x = "No. samples", y = "No. genera", fill = "")
-
-# Zeale - genus level
-ggplot(plot.dataZ_gen) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  # geom_line(aes(x = samp, y = pred), data = pred) +
-  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.25)) +
-  labs(x = "No. samples", y = "No. genera", fill = "")
-
-
-ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
-       dpi = 600, width = 6, height = 4)
-
-# Coleop - genus level
-ggplot(plot.dataC_gen) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  # geom_line(aes(x = samp, y = pred), data = pred) +
-  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.25)) +
-  labs(x = "No. samples", y = "No. genera", fill = "")
-
-# Zeale - family level
-ggplot(plot.dataZ_fam) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  # geom_line(aes(x = samp, y = pred), data = pred) +
-  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.25)) +
-  labs(x = "No. samples", y = "No. families", fill = "")
-
-
-ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
-       dpi = 600, width = 6, height = 4)
-
-# Coleop - family level
-ggplot(plot.dataC_fam) +
-  geom_ribbon(aes(x = samples, ymin = s-2*sd, 
-                  ymax = s+2*sd, fill = method),
-              alpha = 0.5) +  
-  geom_line(aes(x = samples, y = s, group = method), size = 1) +
-  # geom_line(aes(x = samp, y = pred), data = pred) +
-  scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(0.85, 0.25)) +
-  labs(x = "No. samples", y = "No. families", fill = "")
-
-## Fit Lomolino model to the exact accumulation
-mod1 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "lomolino"); AIC(mod1)
-mod2 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "arrhenius"); AIC(mod2)
-mod3 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gleason"); AIC(mod3)
-mod4 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gitay"); AIC(mod4)
-mod5 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "asymp"); AIC(mod5)
-mod6 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gompertz"); AIC(mod6)
-mod7 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "michaelis-menten"); AIC(mod7)
-mod8 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "logis"); AIC(mod8)
-mod9 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "weibull"); AIC(mod9)
+# # construct accumulation curves
 # 
-# coef(mod1)
-# fitted(mod1)
-# plot(both_mat)
+# # calculate accumulation curves - spray - zeale - sp level
+# accum.sprayZ_sp <- accumcomp(sprayZ_sp_mat, 
+#                               y=data.frame(method = rep("spray", 
+#                                                         nrow(sprayZ_sp_mat))),
+#                               factor='method', 
+#                               method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.sprayZ_sp
 # 
-plot(mod9, add = F, col=2, lwd=2)
-pred = data.frame(samp = 1:80,
-                  pred = predict(mod9, newdata = data.frame(Sites = 1:80)))
-pred
+# # calculate accumulation curves - roller - zeale - sp level
+# accum.rollZ_sp <- accumcomp(rollZ_sp_mat, 
+#                              y=data.frame(method = rep("roll", 
+#                                                        nrow(rollZ_sp_mat))),
+#                              factor='method', 
+#                              method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.rollZ_sp
+# 
+# # calculate accumulation curves - both - zeale - sp level
+# accum.bothZ_sp <- accumcomp(bothZ_sp_mat, 
+#                              y=data.frame(method = rep("both", 
+#                                                        nrow(bothZ_sp_mat))),
+#                              factor='method', 
+#                              method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.bothZ_sp
+# 
+# # calculate accumulation curves - spray - coleop - sp level
+# accum.sprayC_sp <- accumcomp(sprayC_sp_mat, 
+#                               y=data.frame(method = rep("spray", 
+#                                                         nrow(sprayC_sp_mat))),
+#                               factor='method', 
+#                               method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.sprayC_sp
+# 
+# # calculate accumulation curves - roll - coleop - sp level
+# accum.rollC_sp<- accumcomp(rollC_sp_mat, 
+#                             y=data.frame(method = rep("roll", 
+#                                                       nrow(rollC_sp_mat))),
+#                             factor='method', 
+#                             method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.rollC_sp
+# 
+# # calculate accumulation curves - both - coleop - sp level
+# accum.bothC_sp <- accumcomp(bothC_sp_mat, 
+#                              y=data.frame(method = rep("both", 
+#                                                        nrow(bothC_sp_mat))),
+#                              factor='method', 
+#                              method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.bothC_sp
+# 
+# # calculate accumulation curves - spray - zeale - genus level
+# accum.sprayZ_gen <- accumcomp(sprayZ_gen_mat, 
+#                      y=data.frame(method = rep("spray", 
+#                                                nrow(sprayZ_gen_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.sprayZ_gen
+# 
+# # calculate accumulation curves - roller - zeale - genus level
+# accum.rollZ_gen <- accumcomp(rollZ_gen_mat, 
+#                      y=data.frame(method = rep("roll", 
+#                                                nrow(rollZ_gen_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.rollZ_gen
+# 
+# # calculate accumulation curves - both - zeale - genus level
+# accum.bothZ_gen <- accumcomp(bothZ_gen_mat, 
+#                      y=data.frame(method = rep("both", 
+#                                                nrow(bothZ_gen_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.bothZ_gen
+# 
+# # calculate accumulation curves - spray - coleop - genus level
+# accum.sprayC_gen <- accumcomp(sprayC_gen_mat, 
+#                      y=data.frame(method = rep("spray", 
+#                                                nrow(sprayC_gen_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.sprayC_gen
+# 
+# # calculate accumulation curves - roll - coleop - genus level
+# accum.rollC_gen<- accumcomp(rollC_gen_mat, 
+#                      y=data.frame(method = rep("roll", 
+#                                                nrow(rollC_gen_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.rollC_gen
+# 
+# # calculate accumulation curves - both - coleop - genus level
+# accum.bothC_gen <- accumcomp(bothC_gen_mat, 
+#                      y=data.frame(method = rep("both", 
+#                                                nrow(bothC_gen_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.bothC_gen
+# 
+# # calculate accumulation curves - spray - zeale - family level
+# accum.sprayZ_fam <- accumcomp(sprayZ_fam_mat, 
+#                      y=data.frame(method = rep("spray", 
+#                                                nrow(sprayZ_fam_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.sprayZ_fam
+# 
+# # calculate accumulation curves - roller - zeale - family level
+# accum.rollZ_fam <- accumcomp(rollZ_fam_mat, 
+#                      y=data.frame(method = rep("roll", 
+#                                                nrow(rollZ_fam_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.rollZ_fam
+# 
+# # calculate accumulation curves - both - zeale - family level
+# accum.bothZ_fam <- accumcomp(bothZ_fam_mat, 
+#                      y=data.frame(method = rep("both", 
+#                                                nrow(bothZ_fam_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.bothZ_fam
+# 
+# # calculate accumulation curves - spray - coleop - family level
+# accum.sprayC_fam <- accumcomp(sprayC_fam_mat, 
+#                      y=data.frame(method = rep("spray", 
+#                                                nrow(sprayC_fam_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.sprayC_fam
+# 
+# # calculate accumulation curves - roll - coleop - family level
+# accum.rollC_fam <- accumcomp(rollC_fam_mat, 
+#                      y=data.frame(method = rep("roll", 
+#                                                nrow(rollC_fam_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.rollC_fam
+# 
+# # calculate accumulation curves - both - coleop - family level
+# accum.bothC_fam <- accumcomp(bothC_fam_mat, 
+#                      y=data.frame(method = rep("both", 
+#                                                nrow(bothC_fam_mat))),
+#                      factor='method', 
+#   method='exact', conditioned=FALSE, plotit=FALSE)
+# accum.bothC_fam
+# 
+# # format data for plotting
+# 
+# # plot data - spray - zeale - sp level
+# plot.data.sprayZ_sp <- data.frame(samples = c(accum.sprayZ_sp[,,1]), 
+#                                    s = c(accum.sprayZ_sp[,,2]), 
+#                                    sd = c(accum.sprayZ_sp[,,3]),
+#                                    method = "Spray")
+# 
+# # plot data - roll - zeale - sp level
+# plot.data.rollZ_sp <- data.frame(samples = c(accum.rollZ_sp[,,1]), 
+#                                   s = c(accum.rollZ_sp[,,2]), 
+#                                   sd = c(accum.rollZ_sp[,,3]),
+#                                   method = "Roller")
+# 
+# # plot data - both - zeale - sp level
+# plot.data.bothZ_sp <- data.frame(samples = c(accum.bothZ_sp[,,1]), 
+#                                   s = c(accum.bothZ_sp[,,2]), 
+#                                   sd = c(accum.bothZ_sp[,,3]),
+#                                   method = "Both")
+# 
+# # combine plot data - zeale - sp level
+# plot.dataZ_sp <- plot.data.sprayZ_sp %>%
+#   bind_rows(plot.data.rollZ_sp) %>%
+#   bind_rows(plot.data.bothZ_sp)
+# 
+# # plot data - spray - coleop - sp level
+# plot.data.sprayC_sp <- data.frame(samples = c(accum.sprayC_sp[,,1]), 
+#                                    s = c(accum.sprayC_sp[,,2]), 
+#                                    sd = c(accum.sprayC_sp[,,3]),
+#                                    method = "Spray")
+# 
+# # plot data - roll - coleop - sp level
+# plot.data.rollC_sp <- data.frame(samples = c(accum.rollC_sp[,,1]), 
+#                                   s = c(accum.rollC_sp[,,2]), 
+#                                   sd = c(accum.rollC_sp[,,3]),
+#                                   method = "Roller")
+# 
+# # plot data - both - coleop - sp level
+# plot.data.bothC_sp <- data.frame(samples = c(accum.bothC_sp[,,1]), 
+#                                   s = c(accum.bothC_sp[,,2]), 
+#                                   sd = c(accum.bothC_sp[,,3]),
+#                                   method = "Both")
+# 
+# # combine plot data - coleop - sp level
+# plot.dataC_sp <- plot.data.sprayC_sp %>%
+#   bind_rows(plot.data.rollC_sp) %>%
+#   bind_rows(plot.data.bothC_sp)
+# 
+# # plot data - spray - zeale - genus level
+# plot.data.sprayZ_gen <- data.frame(samples = c(accum.sprayZ_gen[,,1]), 
+#                                    s = c(accum.sprayZ_gen[,,2]), 
+#                                    sd = c(accum.sprayZ_gen[,,3]),
+#                                    method = "Spray")
+# 
+# # plot data - roll - zeale - genus level
+# plot.data.rollZ_gen <- data.frame(samples = c(accum.rollZ_gen[,,1]), 
+#                                   s = c(accum.rollZ_gen[,,2]), 
+#                                   sd = c(accum.rollZ_gen[,,3]),
+#                                   method = "Roller")
+# 
+# # plot data - both - zeale - genus level
+# plot.data.bothZ_gen <- data.frame(samples = c(accum.bothZ_gen[,,1]), 
+#                                   s = c(accum.bothZ_gen[,,2]), 
+#                                   sd = c(accum.bothZ_gen[,,3]),
+#                                   method = "Both")
+# 
+# # combine plot data - zeale - genus level
+# plot.dataZ_gen <- plot.data.sprayZ_gen %>%
+#   bind_rows(plot.data.rollZ_gen) %>%
+#   bind_rows(plot.data.bothZ_gen)
+# 
+# # plot data - spray - coleop - genus level
+# plot.data.sprayC_gen <- data.frame(samples = c(accum.sprayC_gen[,,1]), 
+#                                    s = c(accum.sprayC_gen[,,2]), 
+#                                    sd = c(accum.sprayC_gen[,,3]),
+#                                    method = "Spray")
+# 
+# # plot data - roll - coleop - genus level
+# plot.data.rollC_gen <- data.frame(samples = c(accum.rollC_gen[,,1]), 
+#                                   s = c(accum.rollC_gen[,,2]), 
+#                                   sd = c(accum.rollC_gen[,,3]),
+#                                   method = "Roller")
+# 
+# # plot data - both - coleop - genus level
+# plot.data.bothC_gen <- data.frame(samples = c(accum.bothC_gen[,,1]), 
+#                                   s = c(accum.bothC_gen[,,2]), 
+#                                   sd = c(accum.bothC_gen[,,3]),
+#                                   method = "Both")
+# 
+# # combine plot data - coleop - genus level
+# plot.dataC_gen <- plot.data.sprayC_gen %>%
+#   bind_rows(plot.data.rollC_gen) %>%
+#   bind_rows(plot.data.bothC_gen)
+# 
+# # plot data - spray - zeale - family level
+# plot.data.sprayZ_fam <- data.frame(samples = c(accum.sprayZ_fam[,,1]), 
+#            s = c(accum.sprayZ_fam[,,2]), 
+#            sd = c(accum.sprayZ_fam[,,3]),
+#            method = "Spray")
+# 
+# # plot data - roll - zeale - family level
+# plot.data.rollZ_fam <- data.frame(samples = c(accum.rollZ_fam[,,1]), 
+#            s = c(accum.rollZ_fam[,,2]), 
+#            sd = c(accum.rollZ_fam[,,3]),
+#            method = "Roller")
+# 
+# # plot data - both - zeale - family level
+# plot.data.bothZ_fam <- data.frame(samples = c(accum.bothZ_fam[,,1]), 
+#            s = c(accum.bothZ_fam[,,2]), 
+#            sd = c(accum.bothZ_fam[,,3]),
+#            method = "Both")
+# 
+# # combine plot data - zeale - family level
+# plot.dataZ_fam <- plot.data.sprayZ_fam %>%
+#   bind_rows(plot.data.rollZ_fam) %>%
+#   bind_rows(plot.data.bothZ_fam)
+# 
+# # plot data - spray - coleop - family level
+# plot.data.sprayC_fam <- data.frame(samples = c(accum.sprayC_fam[,,1]), 
+#            s = c(accum.sprayC_fam[,,2]), 
+#            sd = c(accum.sprayC_fam[,,3]),
+#            method = "Spray")
+# 
+# # plot data - roll - coleop - family level
+# plot.data.rollC_fam <- data.frame(samples = c(accum.rollC_fam[,,1]), 
+#            s = c(accum.rollC_fam[,,2]), 
+#            sd = c(accum.rollC_fam[,,3]),
+#            method = "Roller")
+# 
+# # plot data - both - coleop - family level
+# plot.data.bothC_fam <- data.frame(samples = c(accum.bothC_fam[,,1]), 
+#            s = c(accum.bothC_fam[,,2]), 
+#            sd = c(accum.bothC_fam[,,3]),
+#            method = "Both")
+# 
+# # combine plot data - coleop - family level
+# plot.dataC_fam <- plot.data.sprayC_fam %>%
+#   bind_rows(plot.data.rollC_fam) %>%
+#   bind_rows(plot.data.bothC_fam)
+# 
+# # make plots
+# 
+# # Zeale - species level
+# ggplot(plot.dataZ_sp) +
+#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+#                   ymax = s+2*sd, fill = method),
+#               alpha = 0.5) +  
+#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+#   # geom_line(aes(x = samp, y = pred), data = pred) +
+#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         legend.position = c(0.85, 0.25)) +
+#   labs(x = "No. samples", y = "No. species", fill = "")
+# 
+# ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
+#        dpi = 600, width = 6, height = 4)
+# 
+# # Coleop - species level
+# ggplot(plot.dataC_sp) +
+#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+#                   ymax = s+2*sd, fill = method),
+#               alpha = 0.5) +  
+#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+#   # geom_line(aes(x = samp, y = pred), data = pred) +
+#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         legend.position = c(0.85, 0.25)) +
+#   labs(x = "No. samples", y = "No. genera", fill = "")
+# 
+# # Zeale - genus level
+# ggplot(plot.dataZ_gen) +
+#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+#                   ymax = s+2*sd, fill = method),
+#               alpha = 0.5) +  
+#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+#   # geom_line(aes(x = samp, y = pred), data = pred) +
+#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         legend.position = c(0.85, 0.25)) +
+#   labs(x = "No. samples", y = "No. genera", fill = "")
+# 
+# 
+# ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
+#        dpi = 600, width = 6, height = 4)
+# 
+# # Coleop - genus level
+# ggplot(plot.dataC_gen) +
+#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+#                   ymax = s+2*sd, fill = method),
+#               alpha = 0.5) +  
+#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+#   # geom_line(aes(x = samp, y = pred), data = pred) +
+#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         legend.position = c(0.85, 0.25)) +
+#   labs(x = "No. samples", y = "No. genera", fill = "")
+# 
+# # Zeale - family level
+# ggplot(plot.dataZ_fam) +
+#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+#                   ymax = s+2*sd, fill = method),
+#               alpha = 0.5) +  
+#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+#   # geom_line(aes(x = samp, y = pred), data = pred) +
+#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         legend.position = c(0.85, 0.25)) +
+#   labs(x = "No. samples", y = "No. families", fill = "")
+# 
+# 
+# ggsave("figures/PlotE_species_accumulation_curve_spray_roll3.jpg",
+#        dpi = 600, width = 6, height = 4)
+# 
+# # Coleop - family level
+# ggplot(plot.dataC_fam) +
+#   geom_ribbon(aes(x = samples, ymin = s-2*sd, 
+#                   ymax = s+2*sd, fill = method),
+#               alpha = 0.5) +  
+#   geom_line(aes(x = samples, y = s, group = method), size = 1) +
+#   # geom_line(aes(x = samp, y = pred), data = pred) +
+#   scale_fill_manual(values = c("#CBC3E3", "steelblue", "firebrick")) +
+#   theme_bw() +
+#   theme(text = element_text(size = 14),
+#         legend.position = c(0.85, 0.25)) +
+#   labs(x = "No. samples", y = "No. families", fill = "")
+# 
+# ## Fit Lomolino model to the exact accumulation
+# mod1 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "lomolino"); AIC(mod1)
+# mod2 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "arrhenius"); AIC(mod2)
+# mod3 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gleason"); AIC(mod3)
+# mod4 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gitay"); AIC(mod4)
+# mod5 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "asymp"); AIC(mod5)
+# mod6 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "gompertz"); AIC(mod6)
+# mod7 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "michaelis-menten"); AIC(mod7)
+# mod8 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "logis"); AIC(mod8)
+# mod9 <- fitspecaccum(bothZ_fam_mat, method = "exact", model = "weibull"); AIC(mod9)
+# # 
+# # coef(mod1)
+# # fitted(mod1)
+# # plot(both_mat)
+# # 
+# plot(mod9, add = F, col=2, lwd=2)
+# pred = data.frame(samp = 1:80,
+#                   pred = predict(mod9, newdata = data.frame(Sites = 1:80)))
+# pred
 ```
-# iNEXT
+# construct accumulation curves using iNEXT
 ```{r}
-data(ciliates)
-str(ciliates)
 
+# format data for iNEXT
+accum.data.motu <- list('Leaves (COI)' = t(sprayZ_motu_mat),
+                 'Bark (COI)' = t(rollZ_motu_mat),
+                 'Both substrates (COI)' = t(bothZ_motu_mat),
+                 'Leaves (16S)' = t(sprayC_motu_mat),
+                 'Bark (16S)' = t(rollC_motu_mat),
+                 'Both substrates (16S)' = t(bothC_motu_mat))
 
-accum.data.sp <- list('Spray (Zeale)' = t(sprayZ_sp_mat),
-                 'Roller (Zeale)' = t(rollZ_sp_mat),
-                 'Both methods (Zeale)' = t(bothZ_sp_mat),
-                 'Spray (Coleop)' = t(sprayC_sp_mat),
-                 'Roller (Coleop)' = t(rollC_sp_mat),
-                 'Both methods (Coleop)' = t(bothC_sp_mat))
+accum.data.sp <- list('Leaves (COI)' = t(sprayZ_sp_mat),
+                 'Bark (COI)' = t(rollZ_sp_mat),
+                 'Both substrates (COI)' = t(bothZ_sp_mat),
+                 'Leaves (16S)' = t(sprayC_sp_mat),
+                 'Bark (16S)' = t(rollC_sp_mat),
+                 'Both substrates (16S)' = t(bothC_sp_mat))
 
-accum.data.gen <- list('Spray (Zeale)' = t(sprayZ_gen_mat),
-                 'Roller (Zeale)' = t(rollZ_gen_mat),
-                 'Both methods (Zeale)' = t(bothZ_gen_mat),
-                 'Spray (Coleop)' = t(sprayC_gen_mat),
-                 'Roller (Coleop)' = t(rollC_gen_mat),
-                 'Both methods (Coleop)' = t(bothC_gen_mat))
+accum.data.gen <- list('Leaves (COI)' = t(sprayZ_gen_mat),
+                 'Bark (COI)' = t(rollZ_gen_mat),
+                 'Both substrates (COI)' = t(bothZ_gen_mat),
+                 'Leaves (16S)' = t(sprayC_gen_mat),
+                 'Bark (16S)' = t(rollC_gen_mat),
+                 'Both substrates (16S)' = t(bothC_gen_mat))
 
-accum.data.fam <- list('Spray (Zeale)' = t(sprayZ_fam_mat),
-                 'Roller (Zeale)' = t(rollZ_fam_mat),
-                 'Both methods (Zeale)' = t(bothZ_fam_mat),
-                 'Spray (Coleop)' = t(sprayC_fam_mat),
-                 'Roller (Coleop)' = t(rollC_fam_mat),
-                 'Both methods (Coleop)' = t(bothC_fam_mat))
+accum.data.fam <- list('Leaves (COI)' = t(sprayZ_fam_mat),
+                 'Bark (COI)' = t(rollZ_fam_mat),
+                 'Both substrates (COI)' = t(bothZ_fam_mat),
+                 'Leaves (16S)' = t(sprayC_fam_mat),
+                 'Bark (16S)' = t(rollC_fam_mat),
+                 'Both substrates (16S)' = t(bothC_fam_mat))
+
+# run accumulation curve analyses in iNEXT
+accum.motu <- iNEXT(accum.data.motu, q=0, datatype="incidence_raw", endpoint = 60)
+accum.motu$iNextEst$coverage_based
 
 accum.sp <- iNEXT(accum.data.sp, q=0, datatype="incidence_raw", endpoint = 60)
 accum.sp$iNextEst$coverage_based
@@ -1040,32 +1125,53 @@ accum.gen$iNextEst$coverage_based
 accum.fam <- iNEXT(accum.data.fam, q=0, datatype="incidence_raw", endpoint = 60)
 accum.fam$iNextEst$coverage_based
 
+(motuplot <-
+ggiNEXT(accum.motu, type=1, se=TRUE, 
+        facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,60)) +
+  labs(y = "No. MOTUs") +
+    theme_bw() +
+  theme(text = element_text(size = 14)) +
+  guides(color = "none", shape = "none", fill = "none", linetype = "none")
+)
+
+(spplot <-
 ggiNEXT(accum.sp, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,45)) +
+  scale_x_continuous(limits = c(0,60)) +
   labs(y = "No. species identified") +
     theme_bw() +
   theme(text = element_text(size = 14)) +
   guides(color = "none", shape = "none", fill = "none", linetype = "none")
+)
 
+(genplot <-
 ggiNEXT(accum.gen, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,45)) +
+  scale_x_continuous(limits = c(0,60)) +
   labs(y = "No. genera identified") +
     theme_bw() +
   theme(text = element_text(size = 14)) +
   guides(color = "none", shape = "none", fill = "none", linetype = "none")
+)
 
+(famplot <- 
 ggiNEXT(accum.fam, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,45)) +
+  scale_x_continuous(limits = c(0,60)) +
   labs(y = "No. families identified") +
     theme_bw() +
-  theme(text = element_text(size = 14),
-        legend.position = c(.78, .18)) +
+  theme(text = element_text(size = 15),
+        legend.position = c(.78, .19)) +
   guides(linetype = "none") +
-  theme(legend.key.size = unit(.1, 'cm'), #change legend key size
-        legend.key.height = unit(.1, 'cm'), #change legend key height
-        legend.key.width = unit(.1, 'cm'), #change legend key width
-        legend.title = element_text(size=9), #change legend title font size
-        legend.text = element_text(size=9)) #change legend text font size
+  theme(legend.key.size = unit(.12, 'cm'), #change legend key size
+        legend.key.height = unit(.12, 'cm'), #change legend key height
+        legend.key.width = unit(.12, 'cm'), #change legend key width
+        legend.title = element_text(size=12), #change legend title font size
+        legend.text = element_text(size=12)) #change legend text font size
+)
+
+library(patchwork)
+(motuplot + spplot) / (genplot + famplot)
+ggsave("figures/rev1_accumcurves5.png", width = 12, height = 5, dpi = 400) # 3-panel
+ggsave("figures/rev1_accumcurves10.png", width = 12, height = 10, dpi = 400) # 4-panel
 
 ```
 
