@@ -21,6 +21,7 @@ select <- dplyr::select
 tax_data_path <- "data/arthropod.families_20220816.xlsx"
 # note: the 20220816 version is up-to-date for 2methods
 #   but hadn't received new families from 4methods yet
+'%notin%' <- Negate('%in%')
 
 # read in family name look up 
     # will use to match each OTU with an NCBI family name
@@ -55,6 +56,7 @@ lifemode <- read_xlsx(tax_data_path,
                                  "All larvae aquatic",
                                TRUE ~ "Some larvae aquatic"))
 
+# list families without trait info
 missing.familes <- cs3 %>% 
   select(family) %>%
   bind_rows(select(zs3, family)) %>%
@@ -265,9 +267,8 @@ art_sp_reads <- art_full %>%
   pivot_wider(names_from = primer, values_from = starts_with("sample")) %>%
   select(sci, ends_with("coleop"), ends_with("zeale"))
 
-```
-# Format data for accumulation curves
-```{r}
+#### Format data for accumulation curves
+
 # format data matrices
 
 # spray samples - zeale - motu level
@@ -359,7 +360,7 @@ rollZ_sp_mat[rollZ_sp_mat>0] <- 1
 colnames(rollZ_sp_mat) <- art_sp_reads$sci
 
 # both - zeale - sp level
-zeromat.sp <- matrix(0,1,239)
+zeromat.sp <- matrix(0,1,238)
 sprayZ_sp_mat2 <- rbind(sprayZ_sp_mat[1:2,],
                          zeromat.sp,
                          sprayZ_sp_mat[3:9,],
@@ -423,7 +424,7 @@ rollZ_gen_mat[rollZ_gen_mat>0] <- 1
 colnames(rollZ_gen_mat) <- art_gen_reads$genus
 
 # both - zeale - genus level
-zeromat.gen <- matrix(0,1,311)
+zeromat.gen <- matrix(0,1,310)
 sprayZ_gen_mat2 <- rbind(sprayZ_gen_mat[1:2,],
                          zeromat.gen,
                          sprayZ_gen_mat[3:9,],
@@ -487,7 +488,7 @@ rollZ_fam_mat[rollZ_fam_mat>0] <- 1
 colnames(rollZ_fam_mat) <- art_fam_reads$family
 
 # both - zeale - family level
-zeromat <- matrix(0,1,173)
+zeromat <- matrix(0,1,172)
 sprayZ_fam_mat2 <- rbind(sprayZ_fam_mat[1:2,],
                          zeromat,
                          sprayZ_fam_mat[3:9,],
@@ -626,29 +627,6 @@ ggsave("figures/rev1_accumcurves5.png", width = 12, height = 5, dpi = 400) # 3-p
 ggsave("figures/rev1_accumcurves10.png", width = 12, height = 10, dpi = 400) # 4-panel
 
 ```
-# tally up families from primary and pilot study
-```{r}
-# for now, read in dl from the 4methods Rmd
-old_fam <- unique(dl$fam)
-
-all_fam <- size %>% full_join(data.frame(family = old_fam))
-# 177 families in 21 orders from primary study
-
-just_old <- all_fam %>% filter(is.na(order))
-# additional 15 families only present in pilot data
-
-just_old_sum <- dl %>% 
-  group_by(fam, Method) %>% 
-  summarize(num = sum(total)) %>%
-  filter(fam %in% just_old$family) %>% 
-  tidyr::pivot_wider(values_from = num,
-                     names_from = Method)
-
-just_old_sum_soil_water <- just_old_sum %>%
-  filter(Spray == 0 & Roller == 0)
-dl_sum_water <- dl_sum %>% filter(Method == "Water")
-
-```
 # NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
 ```{r}
 # format data matrices
@@ -701,9 +679,10 @@ env.data <- data.frame(
 
 # package vegan NMDS
 set.seed(110)
-arthNMDS.sp = metaMDS(mds.data.sp.nb,
-                     k=2, distance = 'jaccard', trymax = 10000) 
-saveRDS(arthNMDS.sp, "output/arthNMDS.sp.rds")
+# arthNMDS.sp = metaMDS(mds.data.sp.nb,
+#                      k=2, distance = 'jaccard', trymax = 10000) 
+# saveRDS(arthNMDS.sp, "output/arthNMDS.sp.rds")
+arthNMDS.sp <- readRDS("output/arthNMDS.sp.rds")
 
 plot1 <- ordiplot(arthNMDS.sp, choices = c(1, 2))
 
@@ -730,29 +709,23 @@ str(sites.long1)
     ) +
     scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
     scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
-    scale_color_manual(values = c("steelblue", "firebrick")) +
-    scale_shape_manual(values = c(17, 16)) +
+    scale_color_manual(values = c("steelblue", "steelblue", "steelblue", "steelblue", 
+                                  "firebrick","firebrick", "firebrick", "firebrick")) +
+    scale_fill_manual(values = c("white", "steelblue", "white", "steelblue", 
+                                  "white", "firebrick", "white", "firebrick")) +
+    scale_shape_manual(values = c(21, 21, 24, 24, 21, 21, 24, 24)) +
     geom_point(
       aes(
         x = axis1,
         y = axis2,
-        shape = tree,
-        color = method
+        shape = Method,
+        color = Method,
+        fill = Method,
       ),
       size = 3,
       alpha = 0.85
     ) +
-    geom_point(
-      aes(
-        x = axis1,
-        y = axis2
-      ),
-      size = .75,
-      #alpha = 0.85,
-      color = "black",
-      data = filter(sites.long1, primer == "COI")
-    ) +
-    coord_fixed(ratio = 1) +
+    # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
       x = "NMDS1",
@@ -762,11 +735,11 @@ str(sites.long1)
     theme_bw() +
     theme(text = element_text(size = 12)) +
     ggtitle("Species") +
-    guides(shape = "none", color = "none")
+    guides(shape = "none", color = "none", fill = "none")
 )
 
-ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
-       dpi = 600, width = 6, height = 6)
+# ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
+#        dpi = 600, width = 6, height = 6)
 
 
 # Test for differences among Method and Tree type
@@ -786,9 +759,10 @@ perm_arth
 
 # package vegan NMDS
 set.seed(110)
-arthNMDS.gen = metaMDS(mds.data.gen.nb,
-                     k=2, distance = 'jaccard', trymax = 10000) 
-saveRDS(arthNMDS.gen, "output/arthNMDS.gen.rds")
+# arthNMDS.gen = metaMDS(mds.data.gen.nb,
+#                      k=2, distance = 'jaccard', trymax = 10000) 
+# saveRDS(arthNMDS.gen, "output/arthNMDS.gen.rds")
+arthNMDS.gen <- readRDS("output/arthNMDS.gen.rds")
 
 plot1.gen <- ordiplot(arthNMDS.gen, choices = c(1, 2))
 
@@ -797,8 +771,8 @@ sites.long1.gen <-
   mutate(axis1 = as.numeric(axis1),
          axis2 = as.numeric(axis2),
          Method = paste0(method, " - ", tree, " (", primer, ")"))
-head(sites.long1)
-str(sites.long1)
+head(sites.long1.gen)
+str(sites.long1.gen)
 
 (
   plot.gen <-
@@ -815,29 +789,23 @@ str(sites.long1)
     ) +
     scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
     scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
-    scale_color_manual(values = c("steelblue", "firebrick")) +
-    scale_shape_manual(values = c(17, 16)) +
+    scale_color_manual(values = c("steelblue", "steelblue", "steelblue", "steelblue", 
+                                  "firebrick","firebrick", "firebrick", "firebrick")) +
+    scale_fill_manual(values = c("white", "steelblue", "white", "steelblue", 
+                                  "white", "firebrick", "white", "firebrick")) +
+    scale_shape_manual(values = c(21, 21, 24, 24, 21, 21, 24, 24)) +
     geom_point(
       aes(
         x = axis1,
         y = axis2,
-        shape = tree,
-        color = method
+        shape = Method,
+        color = Method,
+        fill = Method
       ),
       size = 3,
       alpha = 0.85
     ) +
-    geom_point(
-      aes(
-        x = axis1,
-        y = axis2
-      ),
-      size = .75,
-      #alpha = 0.85,
-      color = "black",
-      data = filter(sites.long1.gen, primer == "COI")
-    ) +
-    coord_fixed(ratio = 1) +
+    # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
       x = "NMDS1",
@@ -847,11 +815,11 @@ str(sites.long1)
     theme_bw() +
     theme(text = element_text(size = 12)) +
     ggtitle("Genus") +
-    guides(shape = "none", color = "none")
+    guides(shape = "none", color = "none", fill = "none")
 )
 
-ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
-       dpi = 600, width = 6, height = 6)
+# ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
+#        dpi = 600, width = 6, height = 6)
 
 
 # Test for differences among Method and Tree type (genus level)
@@ -885,9 +853,10 @@ env.data.fam <- data.frame(
 
 # package vegan NMDS
 set.seed(110)
-arthNMDS.fam = metaMDS(mds.data.fam.nb,
-                     k=2, distance = 'jaccard', trymax = 10000) 
-saveRDS(arthNMDS.fam, "output/arthNMDS.fam.rds")
+# arthNMDS.fam = metaMDS(mds.data.fam.nb,
+#                      k=2, distance = 'jaccard', trymax = 10000) 
+# saveRDS(arthNMDS.fam, "output/arthNMDS.fam.rds")
+arthNMDS.fam <- readRDS("output/arthNMDS.fam.rds")
 
 plot1.fam <- ordiplot(arthNMDS.fam, choices = c(1, 2))
 
@@ -914,29 +883,23 @@ str(sites.long1.fam)
     ) +
     scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
     scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
-    scale_color_manual(values = c("steelblue", "firebrick")) +
-    scale_shape_manual(values = c(17, 16)) +
+    scale_color_manual(values = c("steelblue", "steelblue", "steelblue", "steelblue", 
+                                  "firebrick","firebrick", "firebrick", "firebrick")) +
+    scale_fill_manual(values = c("white", "steelblue", "white", "steelblue", 
+                                  "white", "firebrick", "white", "firebrick")) +
+    scale_shape_manual(values = c(21, 21, 24, 24, 21, 21, 24, 24)) +
     geom_point(
       aes(
         x = axis1,
         y = axis2,
-        shape = tree,
-        color = method
+        shape = Method,
+        color = Method,
+        fill = Method
       ),
       size = 3,
       alpha = 0.85
     ) +
-    geom_point(
-      aes(
-        x = axis1,
-        y = axis2
-      ),
-      size = .75,
-      #alpha = 0.85,
-      color = "black",
-      data = filter(sites.long1.fam, primer == "COI")
-    ) +
-    coord_fixed(ratio = 1) +
+    # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
       x = "NMDS1",
@@ -946,11 +909,11 @@ str(sites.long1.fam)
     theme_bw() +
     theme(text = element_text(size = 12)) +
     ggtitle("Family") +
-    guides(shape = "none", color = "none")
+    guides(shape = "none", color = "none", fill = "none")
 )
 
-ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
-       dpi = 600, width = 6, height = 6)
+# ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
+#        dpi = 600, width = 6, height = 6)
 
 
 # Test for differences among Method and Tree type
@@ -963,10 +926,457 @@ perm_arth.fam <- adonis2(mds.data.fam.nb ~ primer + method + tree, data = env.da
 
 perm_arth.fam
 
-plot.sp + plot.gen + plot.fam
-ggsave("figures/rev2_nmds_all4.png", width = 9, height = 3, dpi = 400)
+library(patchwork)
+plot.sp / plot.gen / plot.fam #+ 
+  # plot_layout(widths = c(3, 3, 3),
+              # heights = c(3,3,3))
+
+ggsave("figures/rev2_nmds_all7.png", height = 9, width = 3, dpi = 400)
+```
+# Count up taxa by method and make Venn diagram
+```{r}
+
+### family
+
+# subdivide 'art' into columns by primer / substrate / tree type for counting
+Z_spray <- art_fam_reads %>%
+  select(family, contains(c("CS_zeale", "DS_zeale"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(family) %>%
+  distinct() # 76 for zeale/spray (68 each for zeale/spray/conifer & zeale/spray/decid)
+
+Z_roll <- art_fam_reads %>%
+  select(family, contains(c("CR_zeale", "DR_zeale"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(family) %>%
+  distinct() # 82 for zeale/roll (58 for zeale/roll/conifer; 57 for zeale/roll/decid
+
+C_spray <- art_fam_reads %>%
+  select(family, contains(c("CS_coleop", "DS_coleop"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(family) %>%
+  distinct() # 107 for coleop/spray (80 for coleop/spray/conifer; 91 for coleop/spray/decid)
+
+C_roll <- art_fam_reads %>%
+  select(family, contains(c("CR_coleop", "DR_coleop"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(family) %>%
+  distinct() # 88 for coleop/roll (69 for coleop/roll/conifer; 68 for coleop/roll/decid)
+
+# get unique families within each method (change names to get different combos)
+# zeale has 110 families (50 of which are not found in coleop)
+# coleop has 122 families (62 of which are not found in zeale)
+(C_uni <- C_spray %>%
+    bind_rows(C_roll) %>%
+    distinct() %>%
+  filter(family %notin% unique(c(
+                           Z_spray$family,
+                           Z_roll$family)))) 
+
+# Venn diagram of the 8 primer/substrates
+# code from: https://www.datanovia.com/en/blog/venn-diagram-with-r-or-rstudio-a-million-ways/
+# devtools::install_github("yanlinlin82/ggvenn")
+
+venn_methods_fam <- list(
+  'Leaves (COI)' = Z_spray$family,
+  'Leaves (16S)' = C_spray$family,
+  'Bark (COI)' = Z_roll$family,
+  'Bark (16S)' = C_roll$family
+)
+
+library(ggvenn)
+(vennfam <- ggvenn(
+  venn_methods_fam, 
+  fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
+  # blue, yellow, gray, red
+  stroke_size = 0.6, set_name_size = 3,
+  text_size = 2.25
+  ) + scale_x_continuous(expand = expansion(mult = .2)) #+
+  #ggtitle("Family")
+)
+
+# ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
+
+# pairwise overlap (manually counted from Venn diagram)
+# leaves-bark: 96 overlapping of 173 total (55% overlap)
+# COI-16S: 60 overlapping of 173 total (35% overlap)
+# conif-decid: 112 overlapping of 173 total (65% overlap)
+
+### genus
+
+# subdivide 'art' into columns by primer / substrate / tree type for counting
+Z_spray.gen <- art_gen_reads %>%
+  select(genus, contains(c("CS_zeale", "DS_zeale"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(genus) %>%
+  distinct() # 147 for zeale/spray
+
+Z_roll.gen <- art_gen_reads %>%
+  select(genus, contains(c("CR_zeale", "DR_zeale"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(genus) %>%
+  distinct() # 98 for zeale/roll
+
+C_spray.gen <- art_gen_reads %>%
+  select(genus, contains(c("CS_coleop", "DS_coleop"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(genus) %>%
+  distinct() # 126 for coleop/spray
+
+C_roll.gen <- art_gen_reads %>%
+  select(genus, contains(c("CR_coleop", "DR_coleop"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(genus) %>%
+  distinct() # 81 for coleop/roll
+
+# get unique genera within each method (change names to get different combos)
+# zeale has 191 genera (156 of which are not found in coleop)
+# coleop has 152 genera (117 of which are not found in zeale)
+(C_uni.gen <- C_spray.gen %>%
+    bind_rows(C_roll.gen) %>%
+    distinct() %>%
+  filter(genus %notin% unique(c(
+                           Z_spray.gen$genus, 
+                           Z_roll.gen$genus)))) 
+
+(Z_uni.gen <- Z_spray.gen %>%
+    bind_rows(Z_roll.gen) %>%
+    distinct() %>%
+  filter(genus %notin% unique(c(
+                           C_spray.gen$genus, 
+                           C_roll.gen$genus)))) 
+
+# Venn diagram of the 8 primer/substrates
+# code from: https://www.datanovia.com/en/blog/venn-diagram-with-r-or-rstudio-a-million-ways/
+# devtools::install_github("yanlinlin82/ggvenn")
+
+venn_methods_gen <- list(
+  'Leaves (COI)' = Z_spray.gen$genus,
+  'Leaves (16S)' = C_spray.gen$genus,
+  'Bark (COI)' = Z_roll.gen$genus,
+  'Bark (16S)' = C_roll.gen$genus
+)
+
+library(ggvenn)
+(venngen <- ggvenn(
+  venn_methods_gen, 
+  fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
+  # blue, yellow, gray, red
+  stroke_size = 0.6, set_name_size = 3,
+  text_size = 2.25
+  ) + scale_x_continuous(expand = expansion(mult = .2))#+
+  #ggtitle("Genus")
+)
+
+# ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
+
+# pairwise overlap (manually counted from Venn diagram)
+# leaves-bark: XX overlapping of XX total (XX% overlap)
+# COI-16S: XX overlapping of XX total (XX% overlap)
+# conif-decid: XX overlapping of XX total (65% overlap)
+
+### species
+
+# subdivide 'art' into columns by primer / substrate / tree type for counting
+Z_spray.sp <- art_sp_reads %>%
+  select(sci, contains(c("CS_zeale", "DS_zeale"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(sci) %>%
+  distinct() # 119 for zeale/spray
+
+Z_roll.sp <- art_sp_reads %>%
+  select(sci, contains(c("CR_zeale", "DR_zeale"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(sci) %>%
+  distinct() # 73 for zeale/roll
+
+C_spray.sp <- art_sp_reads %>%
+  select(sci, contains(c("CS_coleop", "DS_coleop"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(sci) %>%
+  distinct() # 80 for coleop/spray
+
+C_roll.sp <- art_sp_reads %>%
+  select(sci, contains(c("CR_coleop", "DR_coleop"))) %>%
+   mutate(sum = rowSums(across(where(is.numeric)))) %>%
+  filter(sum > 0) %>%
+  select(sci) %>%
+  distinct() # 45 for coleop/roll
+
+# get unique genera within each method (change names to get different combos)
+# zeale has 157 sp (146 of which are not found in coleop)
+# coleop has 92 sp (81 of which are not found in zeale)
+(C_uni.sp <- C_spray.sp %>%
+    bind_rows(C_roll.sp) %>%
+    distinct() %>%
+  filter(sci %notin% unique(c(
+                           Z_spray.sp$sci, 
+                           Z_roll.sp$sci)))) 
+
+(Z_uni.sp <- Z_spray.sp %>%
+    bind_rows(Z_roll.sp) %>%
+    distinct() %>%
+  filter(sci %notin% unique(c(
+                           C_spray.sp$sci, 
+                           C_roll.sp$sci)))) 
+
+# Venn diagram of the 8 primer/substrates
+# code from: https://www.datanovia.com/en/blog/venn-diagram-with-r-or-rstudio-a-million-ways/
+# devtools::install_github("yanlinlin82/ggvenn")
+
+venn_methods_sp <- list(
+  'Leaves (COI)' = Z_spray.sp$sci,
+  'Leaves (16S)' = C_spray.sp$sci,
+  'Bark (COI)' = Z_roll.sp$sci,
+  'Bark (16S)' = C_roll.sp$sci
+)
+
+library(ggvenn)
+(vennsp <- ggvenn(
+  venn_methods_sp, 
+  fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
+  # blue, yellow, gray, red
+  stroke_size = 0.6, set_name_size = 3,
+  text_size = 2.25
+  ) + scale_x_continuous(expand = expansion(mult = .2))#+
+  #ggtitle("Species")
+)
+
+# ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
+
+# pairwise overlap (manually counted from Venn diagram)
+# leaves-bark: XX overlapping of XX total (XX% overlap)
+# COI-16S: XX overlapping of XX total (XX% overlap)
+# conif-decid: XX overlapping of XX total (65% overlap)
+
+library(patchwork)
+
+( plot.sp + vennsp ) / ( plot.gen + venngen ) / (plot.fam + vennfam ) # +
+
+#   plot_layout(widths = c(3, 3, 3, 3, 3, 3),
+#                heights = c(3,3,3,3,3,3))
+
+test = gridExtra::arrangeGrob(plot.sp, vennsp, plot.gen, venngen, plot.fam, vennfam)
+
+plot(test)
+
+# ggsave("figures/rev3_venn_all10.png", height = 10, width = 6, dpi = 400)
+
+ggsave(plot = test, filename = "figures/rev4_nmdsvenn_all13.png", height = 10, width = 7, dpi = 400)
+
+# rm(art_spray, art_water, art_roll, art_soil,
+#    soil_unique, spray_unique, roll_unique, water_unique,
+#    venn_methods)
 ```
 
+# Plot relative abundance of orders by method (for each primer set)
+% of samples detected
+```{r}
+#################
+#### Plotting abundance of each order by method (bar charts)
+#### (no. MOTUs)
+#################
+
+### Coleop ###
+
+ordersC <- art_full %>%
+  filter(!is.na(order), primer == "coleop", sample.sum > 0) %>%
+  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+                          TRUE ~ 0),
+         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+                           TRUE ~ 0),
+         idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
+                           TRUE ~ 0),
+         idord = case_when((!is.na(order) & is.na(family) & sample.sum > 0) ~ 1,
+                           TRUE ~ 0)) %>%
+  select(order, idsp, idgen, idfam, idord, sample.sum) %>%
+  group_by(order) %>%
+  summarize(motus = sum(sample.sum > 0),
+            ord = sum(idord),
+            fam = sum(idfam),
+            gen = sum(idgen),
+            sp = sum(idsp),
+            .groups = "drop") %>%
+  right_join(select(art_order_reads, order)) %>%
+  tidyr::replace_na(list(motus = 0, ord = 0, fam = 0, gen = 0, sp = 0))%>%
+  left_join(distinct(select(lineage_lookup, class, order))) %>%
+  arrange(class, order) %>%
+  mutate(primer = "16S")
+
+ordersZ <- art_full %>%
+  filter(!is.na(order), primer == "zeale", sample.sum > 0) %>%
+  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+                          TRUE ~ 0),
+         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+                           TRUE ~ 0),
+         idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
+                           TRUE ~ 0),
+         idord = case_when((!is.na(order) & is.na(family) & sample.sum > 0) ~ 1,
+                           TRUE ~ 0)) %>%
+  select(order, idsp, idgen, idfam, idord, sample.sum) %>%
+  group_by(order) %>%
+  summarize(motus = sum(sample.sum > 0),
+            ord = sum(idord),
+            fam = sum(idfam),
+            gen = sum(idgen),
+            sp = sum(idsp),
+            .groups = "drop") %>%
+  right_join(select(art_order_reads, order)) %>%
+  tidyr::replace_na(list(motus = 0, ord = 0, fam = 0, gen = 0, sp = 0)) %>%
+  left_join(distinct(select(lineage_lookup, class, order))) %>%
+  arrange(class, order) %>%
+  mutate(primer = "COI") 
+
+orders_df <- ordersC %>%
+  bind_rows(ordersZ) %>%
+  mutate(engname = case_when(order == "Mesostigmata" ~ "Mites",
+                          order == "Sarcoptiformes" ~ "Mites",
+                          order == "Trombidiformes" ~ "Mites",
+                          class == "Collembola" ~ "Springtails",
+                          class == "Chilopoda" ~ "Centipedes",
+                          order == "Araneae" ~ "Spiders",
+                          order == "Opiliones" ~ "Harvestmen",
+                          order == "Blattodea" ~ "Cockroaches",
+                          order == "Coleoptera" ~ "Beetles",
+                          order == "Dermaptera" ~ "Earwigs",
+                          order == "Diptera" ~ "Flies",
+                          order == "Ephemeroptera" ~ "Mayflies",
+                          order == "Hemiptera" ~ "True bugs",
+                          order == "Hymenoptera" ~ "Bees, wasps, & ants",
+                          order == "Lepidoptera" ~ "Butterflies & moths",
+                          order == "Mantodea" ~ "Mantids",
+                          order == "Megaloptera" ~ "Dobsonflies",
+                          order == "Cyclopoida" ~ "Copepods",
+                          order == "Neuroptera" ~ "Lacewings",
+                          order == "Odonata" ~ "Dragonflies & damselflies",
+                          order == "Orthoptera" ~ "Crickets & grasshoppers",
+                          order == "Phasmatodea" ~ "Walking sticks",
+                          order == "Phthiraptera" ~ "Thrips",
+                          order == "Psocoptera" ~ "Bark lice",
+                          order == "Siphonaptera" ~ "Fleas",
+                          order == "Trichoptera" ~ "Caddisflies"
+                          )) %>%
+  group_by(class, primer, engname) %>%
+  summarize(Order = sum(ord, na.rm = T),
+            Family = sum(fam, na.rm = T),
+            Genus = sum(gen, na.rm = T),
+            Species = sum(sp, na.rm = T),
+            .groups = "drop") %>%
+  pivot_longer(Order:Species, names_to = "idlevel", values_to = "motus") %>%
+  group_by(class, engname) %>%
+  mutate(summotu = sum(motus)) %>%
+  ungroup() %>%
+  arrange(primer, class, engname, idlevel) %>%
+  mutate(nameorder = case_when(engname == "Flies" ~ 1,
+                             engname == "Beetles" ~ 2,
+                             engname == "Butterflies & moths" ~ 3,
+                             engname == "True bugs" ~ 4,
+                             engname == "Crickets & grasshoppers" ~ 5,
+                             engname == "Bees, wasps, & ants" ~ 6,
+                             engname == "Bark lice" ~ 7,
+                             engname == "Cockroaches" ~ 8,
+                             engname == "Lacewings" ~ 9,
+                             engname == "Dragonflies & damselflies" ~ 10,
+                             engname == "Caddisflies" ~ 11,
+                             engname == "Mantids" ~ 12,
+                             engname == "Mayflies" ~ 13,
+                             engname == "Fleas" ~ 14,
+                             engname == "Dobsonflies" ~ 15,
+                             engname == "Earwigs" ~ 16,
+                             engname == "Thrips" ~ 17,
+                             engname == "Walking sticks" ~ 18,
+                             engname == "Springtails" ~ 19,
+                             engname == "Mites" ~ 20,
+                             engname == "Spiders" ~ 21,
+                             engname == "Harvestmen" ~ 22,
+                             engname == "Centipedes" ~ 23,
+                             engname == "Copepods" ~ 24
+                             )) %>%
+  mutate(taxorder = case_when(idlevel == "Species" ~ 1,
+                              idlevel == "Genus" ~ 2,
+                              idlevel == "Family" ~ 3,
+                              idlevel == "Order" ~ 4)) %>%
+  mutate(engnam2 = fct_reorder(.f = engname, .x = nameorder, .desc = T),
+         engname = fct_reorder(.f = engname, .x = summotu, .desc = F),
+         idlevel = fct_reorder(.f = idlevel, .x = taxorder, .desc = T))
+
+# make plot for less-diverse taxa
+library(forcats)
+ibrary(wesanderson)
+(
+ldiv_plot <- 
+orders_df %>%
+    mutate(group = case_when(summotu >= 31 ~ "More",
+                             TRUE ~ "Less")) %>%
+    filter(group == "Less") %>%
+  ggplot() +
+  geom_col(aes(y = engname, x = motus,
+               fill = idlevel)) +
+  facet_wrap(~ primer, ncol = 2) +
+  # scale_fill_manual(values = wes_palettes$Zissou1) +
+  # scale_color_manual(values = wes_palettes$Zissou1) +
+  scale_fill_manual(values = c("gray10", "gray30", "gray50", "gray70")) +
+  scale_color_manual(values = c("gray10", "gray30", "gray50", "gray70")) +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        axis.text.y = element_text(size = 11), 
+        legend.position = c(.89,.22),
+        legend.background = element_blank(),
+        legend.box.background = element_rect(colour = "black")
+        ) +
+  theme(legend.key.size = unit(.45, 'cm'), #change legend key size
+        legend.key.height = unit(.45, 'cm'), #change legend key height
+        legend.key.width = unit(.45, 'cm'), #change legend key width
+        legend.title = element_text(size=12), #change legend title font size
+        legend.text = element_text(size=12)) +
+  labs(x = "Number of MOTUs",
+       y = "",
+       fill = "Lowest \ntaxonomic \nID") #+
+  #  guides(fill = "none")
+)
+
+# make plot for more-diverse taxa
+(
+hdiv_plot <- 
+orders_df %>%
+    mutate(group = case_when(summotu >= 31 ~ "More",
+                             TRUE ~ "Less")) %>%
+    filter(group == "More") %>%
+  ggplot() +
+  geom_col(aes(y = engname, x = motus,
+               fill = idlevel)) +
+  facet_wrap(~ primer, ncol = 2) +
+  # scale_fill_manual(values = wes_palettes$Darjeeling1) +
+  # scale_color_manual(values = wes_palettes$Darjeeling1) +
+  scale_fill_manual(values = c("gray10", "gray30", "gray50", "gray70")) +
+  scale_color_manual(values = c("gray10", "gray30", "gray50", "gray70")) +
+  theme_bw() +
+  theme(text = element_text(size = 14),
+        axis.text.y = element_text(size = 11)#, legend.position = c(.89,.24)
+        ) +
+  labs(x = "",
+       y = "",
+       fill = "Lowest \ntaxonomic \nID") +
+    guides(fill = "none")
+)
+
+library(patchwork)
+hdiv_plot / ldiv_plot
+
+ggsave("figures/rev5_ordermotus12.png", height = 9, width = 7.5, dpi = 400)
+
+```
 
 
 # Feeding guild - fine scale
@@ -1667,133 +2077,7 @@ feed_plot2 / life_plot2 / size_plot2
 ggsave("figures/PlotL_guilds_multinom3.jpg", 
        width = 5, height = 12, dpi = 400)
 ```
-# Plot relative abundance of orders by method (both primers combined)
-% of samples detected
-```{r}
-#################
-#### Plotting relative abundance of each order by method (bar chart)
-#### (% of samples detected)
-#################
 
-# make a pres/abs dataframe of families by order for each sample
-n_otus_pa <- n_otus_max[,-1]
-n_otus_pa[n_otus_pa > 0] <- 1
-order_pa <- cbind(n_otus_max[,1], n_otus_pa) %>%
-  full_join(lineage_lookup) %>%
-  left_join(distinct(select(famlookup, family, order))) %>%
-  select(-family, -lineage)
-
-# condense that into count of familes by order (roller)
-order_freq_roll <- aggregate(order_pa[,1:40], 
-                           by = list(order_pa$order), sum) %>%
-  select(order = Group.1, ends_with("R"))
-
-# get a vector of the orders
-order_vector <- order_freq_roll$order
-
-# convert family count data into presence absence of each order (roller)
-order_freq_roll[order_freq_roll>0] <- 1
-order_freq_roll <- order_freq_roll %>% 
-  select(-order) # remove messed up order col 
-
-# condense pres/abs into count of familes by order (spray)
-order_freq_spray <- aggregate(order_pa[,1:40], 
-                           by = list(order_pa$order), sum) %>%
-  select(order = Group.1, ends_with("S"))
-
-# convert family count data into presence absence of each order (spray)
-order_freq_spray[order_freq_spray>0] <- 1
-order_freq_spray <- order_freq_spray %>% 
-  select(-order) # remove messed up order col 
-
-# count samples with at least one detection of each order
-order_samps_roll <- data.frame(order = order_vector,
-                          count = apply(order_freq_roll, 1, sum)) %>%
-  mutate(method = "Roller")
-
-order_samps_spray <- data.frame(order = order_vector,
-                          count = apply(order_freq_spray, 1, sum)) %>%
-  mutate(method = "Spray")
-
-# set up plotting order df
-order_df <- data.frame(cat = unique(paste0(art_order$class, "-", 
-                                      art_order$order)),
-                       order = unique(art_order$order),
-           # order2 = c(2,1,3,6,15,9,7,10,12,8,
-           #           14,13,11,22,16,5,20,19,17,21,18),
-          order2 = c(2,1,3,6, 14,7,8,11,13,10,15,12,9,
-                     21,19,5,18,22,17,20,16),
-           name = c("Spiders",
-                    "Sarcoptiform mites",
-                    "Trombidiform mites",
-                    "Collembola",
-                    "Cockroaches",
-                    "Beetles",
-                    "Flies",
-                    "True bugs",
-                    "Bees, wasps, & ants",
-                    "Butterflies & moths",
-                    "Lacewings",
-                    "Crickets & grasshoppers",
-                    "Bark lice",
-                    "Fleas",
-                    "Caddisflies",
-                    "Centipedes",
-                    "Mayflies",
-                    "Mantids",
-                    "Dragonflies & damselflies",
-                    "Walking sticks",
-                    "Thrips")
-           )
-                 
-# bind final plotting dataframe
-order_samps <- order_samps_roll %>%
-  bind_rows(order_samps_spray) %>%
-  left_join(order_df) %>%
-  mutate(name = fct_reorder(name, order2, .desc = T)) %>%
-  group_by(order) %>%
-  mutate(mean_count = mean(count)) %>%
-  ungroup() %>%
-  mutate(pct = case_when(method == "Roller" ~ count/20,
-                         method == "Spray" ~ count/17),
-         pct = 100*pct)
-
-(
-who2_plot <- 
-order_samps %>%
-  ggplot() +
-  geom_col(aes(y = name, x = pct,
-               fill = method),
-           position = position_dodge()) +
-  scale_fill_manual(values = c("steelblue", "firebrick")) +
-  scale_color_manual(values = c("steelblue", "firebrick")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.text.y = element_text(size = 10),
-        legend.position = c(.7,.1)) +
-  labs(x = "% of samples",
-       y = "",
-       fill = "")
-)
-
-# Stitch together primer plots
-library(patchwork) 
-
-feed_mosaic <- feed_plot2 +
-  xlab("") +
-  guides(color = "none")
-
-life_mosaic <- life_plot2 +
-  xlab("") +
-  guides(color = "none")
-
-size_mosaic <- size_plot2 +
-  guides(color = "none")
-
-(feed_mosaic / life_mosaic / size_mosaic) | who2_plot
-
-ggsave("figures/Fig4_order_compare4.png", width = 7, height = 7, dpi = 400)
-```
 
 
 

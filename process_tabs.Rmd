@@ -478,6 +478,8 @@ full_taxa_lookup <- read.csv("full_taxa_lookup1.csv") %>%
 # add higher taxa to sample data
 zs1 <- zs %>%
   left_join(full_taxa_lookup, by = c("sci" = "query"))
+
+# check on phylum list and look at MOTUs with no phylum
 unique(zs1$phylum)
 zs1[is.na(zs1$phylum), c("id", "sci")]
 
@@ -488,13 +490,15 @@ zs2 <- zs1 %>%
 # sum the reads across all samples
 sum(select(zs2, starts_with("sample"))) # 4113232
 
-# add higher taxa to sample data
+# add higher taxa to negative data
 zn1 <- zn %>%
   left_join(full_taxa_lookup, by = c("sci" = "query"))
+
+# check on phylum list and look at MOTUs with no phylum
 unique(zn1$phylum)
 zn1[is.na(zn1$phylum), c("id", "sci")]
 
-# filter out non-fish - negatives
+# filter out non-arthropod - negatives
 zn2 <- zn1 %>%
   filter(phylum == "Arthropoda")
 
@@ -513,6 +517,8 @@ zn2$seqmax <- apply(zn2[,6:11],1, max)
 # add higher taxa to sample data
 cs1 <- cs %>%
   left_join(full_taxa_lookup, by = c("sci" = "query"))
+
+# check on phylum list and look at MOTUs with no phylum
 unique(cs1$phylum)
 cs1[is.na(cs1$phylum), c("id", "sci")]
 
@@ -523,9 +529,11 @@ cs2 <- cs1 %>%
 # sum the reads across all samples
 sum(select(cs2, starts_with("sample"))) # 2068994
 
-# add higher taxa to sample data
+# add higher taxa to negative data
 cn1 <- cn %>%
   left_join(full_taxa_lookup, by = c("sci" = "query"))
+
+# check on phylum list and look at MOTUs with no phylum
 unique(cn1$phylum)
 cn1[is.na(cn1$phylum), c("id", "sci")]
 
