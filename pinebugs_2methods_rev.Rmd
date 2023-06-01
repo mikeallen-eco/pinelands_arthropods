@@ -35,8 +35,19 @@ famlookup <- read_xlsx(tax_data_path,
   distinct()
 
 # read in Zeale & Coleop MOTU data with taxonomy
-zs3 <- read.csv("data/pinebugs.samples.step2.onlyarth.negsub.Z.csv")
-cs3 <- read.csv("data/pinebugs.samples.step2.onlyarth.negsub.C.csv")
+  # excludes MOTUs that were filtered out during negative subtraction etc.
+zs3 <- read.csv("data/pinebugs.samples.step2.onlyarth.negsub.Z.csv") %>%
+  rowwise() %>% 
+  mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
+  ungroup() %>%
+  filter(sample.sum != 0) %>%
+  select(-sample.sum)
+cs3 <- read.csv("data/pinebugs.samples.step2.onlyarth.negsub.C.csv") %>%
+  rowwise() %>% 
+  mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
+  ungroup() %>%
+  filter(sample.sum != 0) %>%
+  select(-sample.sum)
 
 # read in family trait info (life mode)
     # note: class and order added with taxize package using script:
@@ -293,7 +304,7 @@ rollZ_motu_mat[rollZ_motu_mat>0] <- 1
 colnames(rollZ_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "Z"))$id
 
 # both - zeale - sp level
-zeromat.motu.Z <- matrix(0,1,421)
+zeromat.motu.Z <- matrix(0,1,420)
 sprayZ_motu_mat2 <- rbind(sprayZ_motu_mat[1:2,],
                          zeromat.motu.Z,
                          sprayZ_motu_mat[3:9,],
@@ -328,7 +339,7 @@ rollC_motu_mat[rollC_motu_mat>0] <- 1
 colnames(rollC_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "C"))$id
 
 # both - coleop - motu level
-zeromat.motu.C <- matrix(0,1,656)
+zeromat.motu.C <- matrix(0,1,645)
 sprayC_motu_mat2 <- rbind(sprayC_motu_mat[1:10,],
                          zeromat.motu.C,
                          sprayC_motu_mat[11,],
@@ -360,7 +371,7 @@ rollZ_sp_mat[rollZ_sp_mat>0] <- 1
 colnames(rollZ_sp_mat) <- art_sp_reads$sci
 
 # both - zeale - sp level
-zeromat.sp <- matrix(0,1,238)
+zeromat.sp <- matrix(0,1,237)
 sprayZ_sp_mat2 <- rbind(sprayZ_sp_mat[1:2,],
                          zeromat.sp,
                          sprayZ_sp_mat[3:9,],
@@ -424,7 +435,7 @@ rollZ_gen_mat[rollZ_gen_mat>0] <- 1
 colnames(rollZ_gen_mat) <- art_gen_reads$genus
 
 # both - zeale - genus level
-zeromat.gen <- matrix(0,1,310)
+zeromat.gen <- matrix(0,1,307)
 sprayZ_gen_mat2 <- rbind(sprayZ_gen_mat[1:2,],
                          zeromat.gen,
                          sprayZ_gen_mat[3:9,],
@@ -488,7 +499,7 @@ rollZ_fam_mat[rollZ_fam_mat>0] <- 1
 colnames(rollZ_fam_mat) <- art_fam_reads$family
 
 # both - zeale - family level
-zeromat <- matrix(0,1,172)
+zeromat <- matrix(0,1,171)
 sprayZ_fam_mat2 <- rbind(sprayZ_fam_mat[1:2,],
                          zeromat,
                          sprayZ_fam_mat[3:9,],
@@ -531,6 +542,12 @@ sprayC_fam_mat2 <- rbind(sprayC_fam_mat[1:10,],
 
 bothC_fam_mat <- sprayC_fam_mat2 + rollC_fam_mat
 bothC_fam_mat[bothC_fam_mat>0] <- 1
+
+# counting families
+genct <- art_gen_reads %>% 
+  select(genus, sample.sum_coleop, sample.sum_zeale) %>%
+  filter(!(is.na(sample.sum_coleop) & is.na(sample.sum_zeale))) %>%
+  filter(!((sample.sum_coleop == 0) & (sample.sum_zeale == 0)))
 
 ```
 # Fig. 1 - construct accumulation curves using iNEXT
@@ -1957,6 +1974,8 @@ lowreadsampsC40 <- coleop_rare_mat %>%
 
 lowreadsampsZ40 <- zeale_rare_mat %>%
   filter(sample.sum < 40000); (lowreadsampsZ40 <- lowreadsampsZ40$rowname)
+
+unique(c(lowreadsampsC40, lowreadsampsZ40))
 
 # create versions of the dataset with only samples reaching threshold read depths
 
