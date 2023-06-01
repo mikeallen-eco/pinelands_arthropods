@@ -6,3 +6,6 @@
 /figures
 /data
 /output
+/taxo
+*.fas
+.DS_Store
