@@ -11,8 +11,8 @@ library(stringr)
 # library(taxa)
 # library(vegan)
 library(BiodiversityR)
-# library(wesanderson)
-# library(patchwork)
+library(wesanderson)
+library(patchwork)
 library(tidyr)
 library(iNEXT)
 library(forcats)
@@ -27,12 +27,12 @@ tax_data_path <- "data/arthropod.families_20220816.xlsx"
     # will use to match each OTU with an NCBI family name
     # created by looking up each entry in NCBI if it didn't 
       # have a family name yet from bioinformatics work
-famlookup <- read_xlsx(tax_data_path,
-                       sheet = "arthropod.families") %>%
-  select(final_lowest,
-         final_ID = 'final species_name',
-         family:kingdom) %>%
-  distinct()
+# famlookup <- read_xlsx(tax_data_path,
+#                        sheet = "arthropod.families") %>%
+#   select(final_lowest,
+#          final_ID = 'final species_name',
+#          family:kingdom) %>%
+#   distinct()
 
 # read in Zeale & Coleop MOTU data with taxonomy
   # excludes MOTUs that were filtered out during negative subtraction etc.
@@ -549,6 +549,10 @@ genct <- art_gen_reads %>%
   filter(!(is.na(sample.sum_coleop) & is.na(sample.sum_zeale))) %>%
   filter(!((sample.sum_coleop == 0) & (sample.sum_zeale == 0)))
 
+# read counts by unique taxon
+readsC = cs3 %>% group_by(sci) %>% summarize(count = sum(count))
+readsZ = zs3 %>% group_by(sci) %>% summarize(count = sum(count))
+
 ```
 # Fig. 1 - construct accumulation curves using iNEXT
 ```{r}
@@ -695,7 +699,7 @@ zeale_rare_mat20 <- zeale_rare_mat %>%
   filter(rowname %notin% unique(c(lowreadsampsC20, lowreadsampsZ20))) %>%
   select(-rowname)
 
-# get lowest number of reads, excluding the 1 sample with only 195
+# get lowest number of reads
 minreads20 <- min(c(coleop_rare_mat20$sample.sum, zeale_rare_mat20$sample.sum))
 
 rarefy_coleop20 <-rarefy(select(coleop_rare_mat20,-sample.sum), 
@@ -1935,6 +1939,597 @@ ggsave("figures/rev_Fig4alt_ordermotussub4.png",
        height = 9, width = 7.5, dpi = 400)
 
 ```
+# Fig 5 (part 1) - multinomial models for feeding guild data
+https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
+https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
+```{r}
+fam_pa <- art_fam_motus[,-1]
+# fam_pa[fam_pa > 0] <- 1 # previously used sum of families (pres-absence); now using sum of MOTUs
+fam_pa[is.na(fam_pa)] <- 0
+fam_pa <- cbind(art_fam_motus[,1], fam_pa)
+
+feed_freq <- fam_pa %>%
+  left_join(select(diet, family, diet.cat2), by = join_by(family)) %>%
+  select(-family, -starts_with("sample.sum"), -contains("3CS_zeale"))
+
+feed_freq_sum1 <- aggregate(feed_freq[,1:73], 
+                           by = list(feed_freq$diet.cat2), sum)
+
+feed_freq_sumC1 <- feed_freq_sum1 %>%
+  select(contains("coleop")) %>%
+  t()
+colnames(feed_freq_sumC1) <- feed_freq_sum1$Group.1
+
+feed_freq_sumZ1 <- feed_freq_sum1 %>%
+  select(contains("zeale")) %>%
+  t()
+colnames(feed_freq_sumZ1) <- feed_freq_sum1$Group.1
+
+feed_freq_sumC <- feed_freq_sumC1 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(feed_freq_sumC1),
+         tree = stringr::str_sub(sample, -9,-9),
+         method = stringr::str_sub(sample, -8, -8),
+         primer = "16S") %>%
+  rename(mult = 1, myce = 2, para = 3, phyt = 4, pred = 5, scav = 6) %>%
+  select(-sample)
+
+feed_freq_sumZ <- feed_freq_sumZ1 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(feed_freq_sumZ1),
+         tree = stringr::str_sub(sample, -8,-8),
+         method = stringr::str_sub(sample, -7, -7),
+         primer = "COI") %>%
+  rename(mult = 1, myce = 2, para = 3, phyt = 4, pred = 5, scav = 6) %>%
+  select(-sample)
+
+feed_freq_sum <- feed_freq_sumC %>%
+  bind_rows(feed_freq_sumZ)
+
+rm(feed_freq, feed_freq_sum1, feed_freq_sumC1, feed_freq_sumZ1, feed_freq_sumC, feed_freq_sumZ)
+
+library(brms)
+
+dat <- feed_freq_sum
+dat$a1 <- 1
+dat$size <- with(dat, mult + myce + para + phyt + pred + scav)
+dat$y <- with(dat, cbind(mult, myce, para, phyt, pred, scav))
+
+# model with both method and tree type
+set.seed(102)
+fit.prim.method.tree <- brm(bf(y | trials(size) ~ primer + method + tree), 
+            data = dat, family = multinomial(refcat = "mult"),
+            save_pars = save_pars(all = TRUE), cores = 4)
+
+# model with only method
+# set.seed(102)
+# fit.method <- brm(bf(y | trials(size) ~ method), 
+#             data = dat, family = multinomial(refcat = "mult"),
+#             save_pars = save_pars(all = TRUE))
+
+# model with only tree type
+# set.seed(102)
+# fit.tree <- brm(bf(y | trials(size) ~ tree), 
+#             data = dat, family = multinomial(refcat = "mult"),
+#             save_pars = save_pars(all = TRUE))
+# 
+# # adding LOOIC criterion to 3 models
+# fit.method.tree <- add_criterion(fit.method.tree, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# fit.method <- add_criterion(fit.method, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# fit.tree <- add_criterion(fit.tree, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+
+# save model output so we don't have to refit each time
+saveRDS(fit.prim.method.tree, "output/feed_multinomial_prim.method.tree_nb.rds")
+# saveRDS(fit.method, "output/feed_multinomial_method_nb.rds")
+# saveRDS(fit.tree, "output/feed_multinomial_tree_nb.rds")
+
+# load the models so we don't have to refit them each time
+fit.prim.method.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb.rds")
+# fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
+# fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
+
+# evaluating models based on LOOIC
+# brms::loo_compare(fit.method.tree, fit.method, fit.tree, 
+#             criterion = "loo") %>% 
+#   print(simplify = F)
+
+# method is lowest, delta looic = 2.6
+```
+# Fig 5 (part 2) - multinomial models for lifemode data
+https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
+https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
+```{r}
+fam_pa <- art_fam_motus[,-1]
+# fam_pa[fam_pa > 0] <- 1 # previously used sum of families (pres-absence); now using sum of MOTUs
+fam_pa[is.na(fam_pa)] <- 0
+fam_pa <- cbind(art_fam_motus[,1], fam_pa)
+
+life_freq <- fam_pa  %>%
+  left_join(select(lifemode, family, life.cat), by = join_by(family)) %>%
+  select(-family, -starts_with("sample.sum"), -contains("3CS_zeale"))
+
+life_freq_sum1 <- aggregate(life_freq[,1:73], 
+                           by = list(life_freq$life.cat), sum)
+
+life_freq_sumC1 <- life_freq_sum1 %>%
+  select(contains("coleop")) %>%
+  t()
+colnames(life_freq_sumC1) <- life_freq_sum1$Group.1
+
+life_freq_sumZ1 <- life_freq_sum1 %>%
+  select(contains("zeale")) %>%
+  t()
+colnames(life_freq_sumZ1) <- life_freq_sum1$Group.1
+
+life_freq_sumC <- life_freq_sumC1 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(life_freq_sumC1),
+         tree = stringr::str_sub(sample, -9,-9),
+         method = stringr::str_sub(sample, -8, -8),
+         primer = "16S") %>%
+  rename(aqlar = 1, fullaq = 2, fullter = 3, 
+         someaq = 4) %>%
+  select(-sample)
+
+life_freq_sumZ <- life_freq_sumZ1 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(life_freq_sumZ1),
+         tree = stringr::str_sub(sample, -8,-8),
+         method = stringr::str_sub(sample, -7, -7),
+         primer = "COI") %>%
+  rename(aqlar = 1, fullaq = 2, fullter = 3, 
+         someaq = 4) %>%
+  select(-sample)
+
+# format final data file
+life_freq_sum <- life_freq_sumC %>%
+  bind_rows(life_freq_sumZ) %>%
+  mutate(aqlar = fullaq + aqlar) %>%
+  select(-fullaq)
+
+# remove intermediate steps
+rm(life_freq, life_freq_sum1, life_freq_sumC1, life_freq_sumZ1, life_freq_sumC, life_freq_sumZ)
+
+library(brms)
+
+dat <- life_freq_sum
+dat$size <- with(dat, aqlar + fullter + someaq) # removed fullaq
+dat$y <- with(dat, cbind(aqlar, fullter, someaq)) # removed fullaq
+
+# model with both method and tree type
+set.seed(102)
+life.prim.method.tree <- brms::brm(bf(y | trials(size) ~ primer + method + tree), 
+            data = dat, family = multinomial(refcat = "aqlar"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
+
+# model with only method
+# set.seed(102)
+# life.method <- brms::brm(bf(y | trials(size) ~ method), 
+#             data = dat, family = multinomial(refcat = "aqlar"),
+#             save_pars = save_pars(all = TRUE), 
+#                           iter = 4000, warmup = 2000,
+#                           chains = 3, cores = 3)
+
+# model with only tree type
+# set.seed(102)
+# life.tree <- brms::brm(bf(y | trials(size) ~ tree), 
+#             data = dat, family = multinomial(refcat = "aqlar"),
+#             save_pars = save_pars(all = TRUE), 
+#                           iter = 4000, warmup = 2000,
+#                           chains = 3, cores = 3)
+
+# adding LOOIC criterion to 3 models
+# life.method.tree <- brms::add_criterion(life.method.tree, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# life.method <- brms::add_criterion(life.method, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# life.tree <- brms::add_criterion(life.tree, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+
+# save model output so we don't have to refit each time
+saveRDS(life.prim.method.tree, "output/life_multinomial_prim.method.tree_nb.rds")
+# saveRDS(life.method, "output/life_multinomial_method_nb.rds")
+# saveRDS(life.tree, "output/life_multinomial_tree_nb.rds")
+
+# load the models so we don't have to refit them each time
+life.prim.method.tree <- readRDS("output/life_multinomial_method.tree_nb.rds")
+# life.method <- readRDS("output/life_multinomial_method_nb.rds")
+# life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
+
+# evaluating models based on LOOIC
+# brms::loo_compare(life.method.tree, life.method, life.tree, 
+#             criterion = "loo") %>% 
+#   print(simplify = F)
+
+# method is lowest, delta looic = 3.2
+```
+# Fig 5 (part 3) - multinomial models for size data
+https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
+https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
+```{r}
+fam_pa <- art_fam_motus[,-1]
+# fam_pa[fam_pa > 0] <- 1 # previously used sum of families (pres-absence); now using sum of MOTUs
+fam_pa[is.na(fam_pa)] <- 0
+fam_pa <- cbind(art_fam_motus[,1], fam_pa)
+
+size_freq <- fam_pa  %>%
+  left_join(select(size, family, size.cat = Body_Size), by = join_by(family)) %>%
+  select(-family, -starts_with("sample.sum"), -contains("3CS_zeale"))
+
+size_freq_sum1 <- aggregate(size_freq[,1:73], 
+                           by = list(size_freq$size.cat), sum)
+
+size_freq_sumC1 <- size_freq_sum1 %>%
+  select(contains("coleop")) %>%
+  t()
+colnames(size_freq_sumC1) <- size_freq_sum1$Group.1
+
+size_freq_sumZ1 <- size_freq_sum1 %>%
+  select(contains("zeale")) %>%
+  t()
+colnames(size_freq_sumZ1) <- size_freq_sum1$Group.1
+
+size_freq_sumC <- size_freq_sumC1 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(size_freq_sumC1),
+         tree = stringr::str_sub(sample, -9,-9),
+         method = stringr::str_sub(sample, -8, -8),
+         primer = "16S") %>%
+  rename(vsmal = 1, vbig = 2, big = 3, 
+         smal = 4) %>%
+  select(-sample)
+
+size_freq_sumZ <- size_freq_sumZ1 %>%
+  as.data.frame() %>%
+  mutate(sample = rownames(size_freq_sumZ1),
+         tree = stringr::str_sub(sample, -8,-8),
+         method = stringr::str_sub(sample, -7, -7),
+         primer = "COI") %>%
+  rename(vsmal = 1, vbig = 2, big = 3, 
+         smal = 4) %>%
+  select(-sample)
+
+# format final data file
+size_freq_sum <- size_freq_sumC %>%
+  bind_rows(size_freq_sumZ)
+
+# remove intermediate steps
+rm(size_freq, size_freq_sum1, size_freq_sumC1, size_freq_sumZ1, size_freq_sumC, size_freq_sumZ)
+
+library(brms)
+
+dat <- size_freq_sum
+dat$size <- with(dat, vsmal + vbig + big + smal)
+dat$y <- with(dat, cbind(vsmal, vbig, big, smal))
+
+# model with both method and tree type
+set.seed(102)
+size.prim.method.tree <- brms::brm(bf(y | trials(size) ~ primer + method + tree), 
+            data = dat, family = multinomial(refcat = "vsmal"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
+
+# model with only method
+# set.seed(102)
+# size.method <- brms::brm(bf(y | trials(size) ~ method), 
+#             data = dat, family = multinomial(refcat = "vsmal"),
+#             save_pars = save_pars(all = TRUE), 
+#                           iter = 4000, warmup = 2000,
+#                           chains = 3, cores = 3)
+
+# model with only tree type
+# set.seed(102)
+# size.tree <- brms::brm(bf(y | trials(size) ~ tree), 
+#             data = dat, family = multinomial(refcat = "vsmal"),
+#             save_pars = save_pars(all = TRUE), 
+#                           iter = 4000, warmup = 2000,
+#                           chains = 3, cores = 3)
+
+# adding LOOIC criterion to 3 models
+# size.method.tree <- brms::add_criterion(size.method.tree, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# size.method <- brms::add_criterion(size.method, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# size.tree <- brms::add_criterion(size.tree, "loo", 
+#                                  moment_match = T,
+#                           reloo = TRUE)
+
+# save model output so we don't have to refit each time
+saveRDS(size.prim.method.tree, "output/size_multinomial_prim.method.tree_nb.rds")
+# saveRDS(size.method, "output/size_multinomial_method_nb.rds")
+# saveRDS(size.tree, "output/size_multinomial_tree_nb.rds")
+
+# load the models so we don't have to refit them each time
+size.prim.method.tree <- readRDS("output/size_multinomial_prim.method.tree_nb.rds")
+# size.method <- readRDS("output/size_multinomial_method_nb.rds")
+# size.tree <- readRDS("output/size_multinomial_tree_nb.rds")
+
+# evaluating models based on LOOIC
+# brms::loo_compare(size.method.tree, size.method, size.tree, 
+#             criterion = "loo") %>% 
+#   print(simplify = F)
+
+# method is lowest; delta looic = 4.7
+```
+# Fig 5 (final) - Multinomial model plots (feeding, life mode, body size)
+```{r}
+### Feeding guild
+
+# plot settings
+dod <- .75
+psiz <- 1.25
+thin <- 0.3
+thik <- 0.75
+
+# load the models so we don't have to refit them each time
+fit.prim.method.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb.rds")
+# fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
+# fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
+
+# plot top model predictions
+fit.newdata = expand.grid(method = c("S", "R"),
+                          tree = c("D", "C"),
+                          primer = c("COI", "16S"),
+                                 size = 1)
+
+fitsies <- fitted(fit.prim.method.tree, 
+                  newdata = fit.newdata,probs = c(0.025, 0.1,
+                                                  0.9, 0.975))
+
+dim(fitsies )
+fitsies # dims are expand grid rows (8), quantiles etc. (6), levels of Y (6)
+names(fitsies[1,1,])
+
+fitsies.list <- list()
+for(i in 1:dim(fitsies)[3]){
+  fitsies.list[[i]] <- fitsies[,,i]
+}
+
+fits_df <- do.call(rbind, fitsies.list) %>%
+  as.data.frame() %>%
+  mutate(method = rep(fit.newdata$method, 6),
+         tree = rep(fit.newdata$tree, 6),
+         primer = rep(fit.newdata$primer, 6),
+         feed = c(rep("Mulitple categories", 8),
+                  rep("Mycetophagous", 8),
+                  rep("Parasite/Parasitoid", 8),
+                  rep("Phytophagous", 8),
+                  rep("Predator", 8),
+                  rep("Scavenger", 8))) %>%
+  group_by(feed) %>%
+  mutate(mean_p = mean(Estimate)) %>%
+  ungroup() %>%
+  mutate(feed = fct_reorder(feed, mean_p),
+         method = case_when(method == "S" ~ "Understory",
+                            method == "R" ~ "Bark"),
+         tree = case_when(tree == "D" ~ "Deciduous",
+                            tree == "C" ~ "Conifer"))
+         
+(feed_plot2 <-
+fits_df %>%
+    mutate(methodtreeprimer = paste0(method, " - ", tree, " (", primer, ")")) %>%
+  ggplot() +
+  geom_errorbar(aes(y = feed, xmin = 100*Q2.5, 
+                    xmax = 100*Q97.5, color = methodtreeprimer,
+                    group = methodtreeprimer),
+                position = position_dodge(width = dod),
+                width = 0, size = thin) +  
+  geom_errorbar(aes(y = feed, xmin = 100*Q10, 
+                    xmax = 100*Q90, color = methodtreeprimer,
+                    group = methodtreeprimer),
+                size = thik,
+                position = position_dodge(width = dod),
+                width = 0) +
+  geom_point(aes(y = feed, x = 100*Estimate, color = methodtreeprimer,
+                 fill = methodtreeprimer,
+                 shape = methodtreeprimer),
+             position = position_dodge(width = dod),
+             size = psiz) +
+  scale_color_manual(values = c("steelblue", "steelblue", "steelblue", "steelblue",
+                                "firebrick", "firebrick", "firebrick", "firebrick")) +
+  scale_fill_manual(values = c("steelblue", "white", "steelblue", "white",
+                                "firebrick", "white", "firebrick", "white")) +
+  scale_shape_manual(values = c(24,24,21,21,24,24,21,21)) +
+  labs(color = "",
+       y = "",
+       x = "",
+       title = "Feeding guild",
+       fill = "Sample type",
+       shape = "Sample type") +
+  theme_bw() +
+  theme(text = element_text(size = 13),
+        legend.position = c(.8,.2)) +
+    guides(color = "none", shape = "none", fill = "none")
+ )
+
+### Body size
+
+# load the models so we don't have to refit them each time
+size.prim.method.tree <- readRDS("output/size_multinomial_prim.method.tree_nb.rds")
+# size.method <- readRDS("output/size_multinomial_method.rds")
+# size.tree <- readRDS("output/size_multinomial_tree.rds")
+
+# plot top model predictions
+fit.newdata = expand.grid(method = c("S", "R"),
+                          tree = c("D", "C"),
+                          primer = c("COI", "16S"),
+                                 size = 1)
+
+fitsies <- fitted(size.prim.method.tree, 
+                  newdata = fit.newdata,probs = c(0.025, 0.1,
+                                                  0.9, 0.975))
+
+dim(fitsies )
+fitsies # dims are expand grid rows (8), quantiles etc. (6), levels of Y (4)
+names(fitsies[1,1,])
+
+fitsies.list <- list()
+for(i in 1:dim(fitsies)[3]){
+  fitsies.list[[i]] <- fitsies[,,i]
+}
+
+size_fits_df <- do.call(rbind, fitsies.list) %>%
+  as.data.frame() %>%
+  mutate(method = rep(fit.newdata$method, 4),
+         tree = rep(fit.newdata$tree, 4),
+         primer = rep(fit.newdata$primer, 4),
+         size = c(rep("< 5 mm", 8),
+                  rep("> 20 mm", 8),
+                  rep("10-20 mm", 8),
+                  rep("5-10 mm", 8))) %>%
+  group_by(size) %>%
+  mutate(mean_p = mean(Estimate)) %>%
+  ungroup() %>%
+  mutate(size = fct_reorder(size, mean_p),
+         method = case_when(method == "S" ~ "Understory",
+                            method == "R" ~ "Bark"),
+         tree = case_when(tree == "D" ~ "Deciduous",
+                            tree == "C" ~ "Conifer"))
+         
+(size_plot2 <- 
+size_fits_df %>%
+    mutate(methodtreeprimer = paste0(method, " - ", tree, " (", primer, ")")) %>%
+  ggplot() +
+  geom_errorbar(aes(y = size, xmin = 100*Q2.5, 
+                    xmax = 100*Q97.5, color = methodtreeprimer,
+                    group = methodtreeprimer),
+                position = position_dodge(width = dod),
+                width = 0, size = thin) +  
+  geom_errorbar(aes(y = size, xmin = 100*Q10, 
+                    xmax = 100*Q90, color = methodtreeprimer,
+                    group = methodtreeprimer),
+                size = thik,
+                position = position_dodge(width = dod),
+                width = 0) +
+  geom_point(aes(y = size, x = 100*Estimate, color = methodtreeprimer,
+                 fill = methodtreeprimer,
+                 shape = methodtreeprimer),
+             position = position_dodge(width = dod),
+             size = psiz) +
+  scale_color_manual(values = c("steelblue", "steelblue", "steelblue", "steelblue",
+                                "firebrick", "firebrick", "firebrick", "firebrick")) +
+  scale_fill_manual(values = c("steelblue", "white", "steelblue", "white",
+                                "firebrick", "white", "firebrick", "white")) +
+  scale_shape_manual(values = c(24,24,21,21,24,24,21,21)) +
+  labs(color = "",
+       y = "",
+       x = "",
+       title = "Body size",
+       fill = "Sample type",
+       shape = "Sample type") +
+  theme_bw() +
+  theme(text = element_text(size = 13),
+        legend.position = c(.8,.2)) +
+    guides(color = "none", shape = "none", fill = "none")
+ )
+
+### Life mode
+
+# load the models so we don't have to refit them each time
+life.prim.method.tree <- readRDS("output/life_multinomial_prim.method.tree_nb.rds")
+# life.method <- readRDS("output/life_multinomial_method_nb.rds")
+# life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
+
+# plot top model predictions
+fit.newdata = expand.grid(method = c("S", "R"),
+                          tree = c("D", "C"),
+                          primer = c("COI", "16S"),
+                                 size = 1)
+
+fitsies <- fitted(life.prim.method.tree, 
+                  newdata = fit.newdata,probs = c(0.025, 0.1,
+                                                  0.9, 0.975))
+
+dim(fitsies )
+fitsies # dims are expand grid rows (8), quantiles etc. (6), levels of Y (3)
+names(fitsies[1,1,])
+
+fitsies.list <- list()
+for(i in 1:dim(fitsies)[3]){
+  fitsies.list[[i]] <- fitsies[,,i]
+}
+
+life_fits_df <- do.call(rbind, fitsies.list) %>%
+  as.data.frame() %>%
+  mutate(method = rep(fit.newdata$method, 3),
+         tree = rep(fit.newdata$tree, 3),
+         primer = rep(fit.newdata$primer, 3),
+         life = c(rep("All larvae aquatic", 8),
+                  rep("Fully terrestrial", 8),
+                  rep("Some larvae aquatic", 8))) %>%
+  group_by(life) %>%
+  mutate(mean_p = mean(Estimate)) %>%
+  ungroup() %>%
+  mutate(life = fct_reorder(life, mean_p),
+         method = case_when(method == "S" ~ "Understory",
+                            method == "R" ~ "Bark"),
+         tree = case_when(tree == "D" ~ "Deciduous",
+                            tree == "C" ~ "Conifer"))
+         
+(life_plot2 <-
+life_fits_df %>%
+    mutate(methodtreeprimer = paste0(method, " - ", tree, " (", primer, ")")) %>%
+  ggplot() +
+  geom_errorbar(aes(y = life, xmin = 100*Q2.5, 
+                    xmax = 100*Q97.5, color = methodtreeprimer,
+                    group = methodtreeprimer),
+                position = position_dodge(width = dod),
+                width = 0, size = thin) +  
+  geom_errorbar(aes(y = life, xmin = 100*Q10, 
+                    xmax = 100*Q90, color = methodtreeprimer,
+                    group = methodtreeprimer),
+                size = thik,
+                position = position_dodge(width = dod),
+                width = 0) +
+  geom_point(aes(y = life, x = 100*Estimate, color = methodtreeprimer,
+                 fill = methodtreeprimer,
+                 shape = methodtreeprimer),
+             position = position_dodge(width = dod),
+             size = psiz) +
+  scale_color_manual(values = c("steelblue", "steelblue", "steelblue", "steelblue",
+                                "firebrick", "firebrick", "firebrick", "firebrick")) +
+  scale_fill_manual(values = c("steelblue", "white", "steelblue", "white",
+                                "firebrick", "white", "firebrick", "white")) +
+  scale_shape_manual(values = c(24,24,21,21,24,24,21,21)) +
+  labs(color = "",
+       y = "",
+       x = "% of families",
+       title = "Life mode",
+       fill = "Sample type",
+       shape = "Sample type",
+       color = "Sample type") +
+  theme_bw() +
+  theme(text = element_text(size = 13),
+        legend.position = c(.675,.22)) +
+  guides(color = "none") +
+  theme(legend.key.size = unit(.10, 'cm'), #change legend key size
+        legend.key.height = unit(.10, 'cm'), #change legend key height
+        legend.key.width = unit(.10, 'cm'), #change legend key width
+        legend.title = element_text(size=9), #change legend title font size
+        legend.text = element_text(size=9), #change legend text font size
+        legend.background = element_rect(fill = "transparent"))  
+ )
+
+### Combine all 3 plots with patchwork
+feed_plot2 / size_plot2 / life_plot2
+
+ggsave("figures/rev_Fig5_guilds_multinom19.jpg",
+       width = 5, height = 12, dpi = 400)
+```
 # Fig. S1 - Richness, diversity, evenness - by substrate, tree type, primer
 # rarefied to 40000 reads (drops 12 samples)
 Plots & models of rarefied species richness, shannon & simpson indexes, relative read frequency by primer
@@ -2230,6 +2825,37 @@ rareS.plot / rareSimpson.plot / rareShannon.plot
 
 ggsave("figures/rev_FigS1_rarefieddiv_40k.png", width = 5, height = 7, dpi = 400)
 ```
+# Examining reference databases
+```{r}
+
+library(data.table)
+
+cref <- fread("data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.C.tsv") %>%
+  mutate(len = nchar(sequence))
+
+zref <- fread("data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.Z.tsv") %>%
+  mutate(len = nchar(sequence))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+...old below here...
+
+
+
+
+
+
 
 
 
@@ -2462,482 +3088,6 @@ ggsave("figures/PlotK_guilds_bar.jpg",
        width = 6, height = 12, dpi = 400)
 
 ```
-# multinomial models for feeding guild data
-https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
-https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
-```{r}
-n_otus_pa <- n_otus_max[,-1]
-n_otus_pa[n_otus_pa > 0] <- 1
-n_otus_pa <- cbind(n_otus_max[,1], n_otus_pa)
-
-feed_freq <- n_otus_pa %>%
-  left_join(lineage_lookup) %>%
-  left_join(select(diet, family, diet.cat2)) %>%
-  select(-family, -lineage)
-
-feed_freq_sum1 <- aggregate(feed_freq[,1:40], 
-                           by = list(feed_freq$diet.cat2), sum)
-
-feed_freq_sum2 <- feed_freq_sum1 %>%
-  select(2:41) %>%
-  t()
-colnames(feed_freq_sum2) <- feed_freq_sum1$Group.1
-
-feed_freq_sum <- feed_freq_sum2 %>%
-  as.data.frame() %>%
-  mutate(sample = rownames(feed_freq_sum2),
-         tree = stringr::str_sub(sample, -2,-2),
-         method = stringr::str_sub(sample, -1, -1)) %>%
-  rename(mult = 1, myce = 2, para = 3, phyt = 4, pred = 5, scav = 6) %>%
-  select(-sample)
-
-library(brms)
-
-dat <- feed_freq_sum
-dat$a1 <- 1
-dat$size <- with(dat, mult + myce + para + phyt + pred + scav)
-dat$y <- with(dat, cbind(mult, myce, para, phyt, pred, scav))
-# remove 3 blank samples
-dat <- dat %>%
-  filter(size > 0)
-
-# model with both method and tree type
-set.seed(102)
-fit.method.tree <- brm(bf(y | trials(size) ~ method + tree), 
-            data = dat, family = multinomial(refcat = "mult"),
-            save_pars = save_pars(all = TRUE))
-
-# model with only method
-set.seed(102)
-fit.method <- brm(bf(y | trials(size) ~ method), 
-            data = dat, family = multinomial(refcat = "mult"),
-            save_pars = save_pars(all = TRUE))
-
-# model with only tree type
-set.seed(102)
-fit.tree <- brm(bf(y | trials(size) ~ tree), 
-            data = dat, family = multinomial(refcat = "mult"),
-            save_pars = save_pars(all = TRUE))
-
-# adding LOOIC criterion to 3 models
-fit.method.tree <- add_criterion(fit.method.tree, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-fit.method <- add_criterion(fit.method, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-fit.tree <- add_criterion(fit.tree, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-
-# save model output so we don't have to refit each time
-saveRDS(fit.method.tree, "output/feed_multinomial_method.tree_nb.rds")
-saveRDS(fit.method, "output/feed_multinomial_method_nb.rds")
-saveRDS(fit.tree, "output/feed_multinomial_tree_nb.rds")
-
-# load the models so we don't have to refit them each time
-fit.method.tree <- readRDS("output/feed_multinomial_method.tree_nb.rds")
-fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
-fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
-
-# evaluating models based on LOOIC
-brms::loo_compare(fit.method.tree, fit.method, fit.tree, 
-            criterion = "loo") %>% 
-  print(simplify = F)
-
-# method is lowest, delta looic = 2.6
-```
-# multinomial models for lifemode data
-https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
-https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
-```{r}
-n_otus_pa <- n_otus_max[,-1]
-n_otus_pa[n_otus_pa > 0] <- 1
-n_otus_pa <- cbind(n_otus_max[,1], n_otus_pa)
-
-life_freq <- n_otus_pa %>%
-  left_join(lineage_lookup) %>%
-  left_join(select(lifemode, family, life.cat)) %>%
-  select(-family, -lineage)
-
-life_freq_sum1 <- aggregate(life_freq[,1:40], 
-                           by = list(life_freq$life.cat), sum)
-
-life_freq_sum2 <- life_freq_sum1 %>%
-  select(2:41) %>%
-  t()
-colnames(life_freq_sum2) <- life_freq_sum1$Group.1
-
-life_freq_sum <- life_freq_sum2 %>%
-  as.data.frame() %>%
-  mutate(sample = rownames(life_freq_sum2),
-         tree = stringr::str_sub(sample, -2,-2),
-         method = stringr::str_sub(sample, -1, -1)) %>%
-  rename(aqlar = 1, fullaq = 2, fullter = 3, 
-         someaq = 4) %>%
-  select(-sample)
-
-library(brms)
-
-dat <- life_freq_sum
-dat$size <- with(dat, aqlar + fullaq + fullter + someaq)
-dat$y <- with(dat, cbind(aqlar, fullaq, fullter, someaq))
-# remove 3 blank samples
-dat <- dat %>%
-  filter(size > 0)
-
-# model with both method and tree type
-set.seed(102)
-life.method.tree <- brms::brm(bf(y | trials(size) ~ method + tree), 
-            data = dat, family = multinomial(refcat = "aqlar"),
-            save_pars = save_pars(all = TRUE), 
-                          iter = 4000, warmup = 2000,
-                          chains = 3, cores = 3)
-
-# model with only method
-set.seed(102)
-life.method <- brms::brm(bf(y | trials(size) ~ method), 
-            data = dat, family = multinomial(refcat = "aqlar"),
-            save_pars = save_pars(all = TRUE), 
-                          iter = 4000, warmup = 2000,
-                          chains = 3, cores = 3)
-
-# model with only tree type
-set.seed(102)
-life.tree <- brms::brm(bf(y | trials(size) ~ tree), 
-            data = dat, family = multinomial(refcat = "aqlar"),
-            save_pars = save_pars(all = TRUE), 
-                          iter = 4000, warmup = 2000,
-                          chains = 3, cores = 3)
-
-# adding LOOIC criterion to 3 models
-life.method.tree <- brms::add_criterion(life.method.tree, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-life.method <- brms::add_criterion(life.method, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-life.tree <- brms::add_criterion(life.tree, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-
-# save model output so we don't have to refit each time
-saveRDS(life.method.tree, "output/life_multinomial_method.tree_nb.rds")
-saveRDS(life.method, "output/life_multinomial_method_nb.rds")
-saveRDS(life.tree, "output/life_multinomial_tree_nb.rds")
-
-# load the models so we don't have to refit them each time
-life.method.tree <- readRDS("output/life_multinomial_method.tree_nb.rds")
-life.method <- readRDS("output/life_multinomial_method_nb.rds")
-life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
-
-# evaluating models based on LOOIC
-brms::loo_compare(life.method.tree, life.method, life.tree, 
-            criterion = "loo") %>% 
-  print(simplify = F)
-
-# method is lowest, delta looic = 3.2
-```
-# multinomial models for size data
-https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
-https://discourse.mc-stan.org/t/interpret-parameters-from-multinomial-categorical-logit-regression/26374
-```{r}
-n_otus_pa <- n_otus_max[,-1]
-n_otus_pa[n_otus_pa > 0] <- 1
-n_otus_pa <- cbind(n_otus_max[,1], n_otus_pa)
-
-size_freq <- n_otus_pa %>%
-  left_join(lineage_lookup) %>%
-  left_join(select(size, family, size.cat = Body_Size)) %>%
-  select(-family, -lineage)
-
-size_freq_sum1 <- aggregate(size_freq[,1:40], 
-                           by = list(size_freq$size.cat), sum)
-
-size_freq_sum2 <- size_freq_sum1 %>%
-  select(2:41) %>%
-  t()
-colnames(size_freq_sum2) <- size_freq_sum1$Group.1
-
-size_freq_sum <- size_freq_sum2 %>%
-  as.data.frame() %>%
-  mutate(sample = rownames(size_freq_sum2),
-         tree = stringr::str_sub(sample, -2,-2),
-         method = stringr::str_sub(sample, -1, -1)) %>%
-  rename(vsmal = 1, vbig = 2, big = 3, 
-         smal = 4) %>%
-  select(-sample)
-
-# library(brms)
-
-dat <- size_freq_sum
-dat$size <- with(dat, vsmal + vbig + big + smal)
-dat$y <- with(dat, cbind(vsmal, vbig, big, smal))
-# remove 3 blank samples
-dat <- dat %>%
-  filter(size > 0)
-
-# model with both method and tree type
-set.seed(102)
-size.method.tree <- brms::brm(bf(y | trials(size) ~ method + tree), 
-            data = dat, family = multinomial(refcat = "vsmal"),
-            save_pars = save_pars(all = TRUE), 
-                          iter = 4000, warmup = 2000,
-                          chains = 3, cores = 3)
-
-# model with only method
-set.seed(102)
-size.method <- brms::brm(bf(y | trials(size) ~ method), 
-            data = dat, family = multinomial(refcat = "vsmal"),
-            save_pars = save_pars(all = TRUE), 
-                          iter = 4000, warmup = 2000,
-                          chains = 3, cores = 3)
-
-# model with only tree type
-set.seed(102)
-size.tree <- brms::brm(bf(y | trials(size) ~ tree), 
-            data = dat, family = multinomial(refcat = "vsmal"),
-            save_pars = save_pars(all = TRUE), 
-                          iter = 4000, warmup = 2000,
-                          chains = 3, cores = 3)
-
-# adding LOOIC criterion to 3 models
-size.method.tree <- brms::add_criterion(size.method.tree, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-size.method <- brms::add_criterion(size.method, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-size.tree <- brms::add_criterion(size.tree, "loo", 
-                                 moment_match = T,
-                          reloo = TRUE)
-
-# save model output so we don't have to refit each time
-saveRDS(size.method.tree, "output/size_multinomial_method.tree_nb.rds")
-saveRDS(size.method, "output/size_multinomial_method_nb.rds")
-saveRDS(size.tree, "output/size_multinomial_tree_nb.rds")
-
-# load the models so we don't have to refit them each time
-size.method.tree <- readRDS("output/size_multinomial_method.tree_nb.rds")
-size.method <- readRDS("output/size_multinomial_method_nb.rds")
-size.tree <- readRDS("output/size_multinomial_tree_nb.rds")
-
-# evaluating models based on LOOIC
-brms::loo_compare(size.method.tree, size.method, size.tree, 
-            criterion = "loo") %>% 
-  print(simplify = F)
-
-# method is lowest; delta looic = 4.7
-```
-# Multinomial model plots (feeding, life mode, body size)
-```{r}
-### Feeding guild
-
-# load the models so we don't have to refit them each time
-fit.method.tree <- readRDS("output/feed_multinomial_method.tree_nb.rds")
-fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
-fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
-
-# plot top model predictions
-fit.newdata = expand.grid(method = c("S", "R"),
-                                 size = 1)
-
-fitsies <- fitted(fit.method, 
-                  newdata = fit.newdata,probs = c(0.025, 0.1,
-                                                  0.9, 0.975))
-
-fitsies
-
-fitsies.list <- list()
-for(i in 1:dim(fitsies)[3]){
-  fitsies.list[[i]] <- fitsies[,,i]
-}
-
-fits_df <- do.call(rbind, fitsies.list) %>%
-  as.data.frame() %>%
-  mutate(method = rep(fit.newdata$method, 6),
-         feed = c(rep("Mulitple categories", 2),
-                  rep("Mycetophagous", 2),
-                  rep("Parasite/Parasitoid", 2),
-                  rep("Phytophagous", 2),
-                  rep("Predator", 2),
-                  rep("Scavenger", 2))) %>%
-  group_by(feed) %>%
-  mutate(mean_p = mean(Estimate)) %>%
-  ungroup() %>%
-  mutate(feed = fct_reorder(feed, mean_p),
-         method = case_when(method == "S" ~ "Spray",
-                            method == "R" ~ "Roller"))
-         
-(
-  feed_plot2 <- 
-fits_df %>%
-  ggplot() +
-  geom_point(aes(y = feed, x = 100*Estimate, color = method, 
-                 group = method),
-             position = position_dodge(width = .75),
-             size = 2) +
-  geom_errorbar(aes(y = feed, xmin = 100*Q10, 
-                    xmax = 100*Q90, color = method,
-                    group = method),
-                size = 1,
-                position = position_dodge(width = .75),
-                width = 0) +
-  geom_errorbar(aes(y = feed, xmin = 100*Q2.5, 
-                    xmax = 100*Q97.5, color = method,
-                    group = method),
-                position = position_dodge(width = .75),
-                width = 0) +
-  scale_color_manual(values = c("steelblue", "firebrick")) +
-  labs(color = "",
-       y = "",
-       x = "% of families",
-       title = "Feeding guild") +
-  theme_bw() +
-  theme(text = element_text(size = 13),
-        legend.position = c(.8,.2))
-)
-
-### Life mode
-
-# load the models so we don't have to refit them each time
-life.method.tree <- readRDS("output/life_multinomial_method.tree_nb.rds")
-life.method <- readRDS("output/life_multinomial_method_nb.rds")
-life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
-
-# plot top model predictions
-fit.newdata = expand.grid(method = c("S", "R"),
-                                 size = 1)
-
-fitsies <- fitted(life.method, 
-                  newdata = fit.newdata,probs = c(0.025, 0.1,
-                                                  0.9, 0.975))
-
-fitsies
-
-fitsies.list <- list()
-for(i in 1:dim(fitsies)[3]){
-  fitsies.list[[i]] <- fitsies[,,i]
-}
-
-life_fits_df <- do.call(rbind, fitsies.list) %>%
-  as.data.frame() %>%
-  mutate(method = rep(fit.newdata$method, 4),
-         life = c(rep("All larvae aquatic", 2),
-                  rep("Fully aquatic", 2),
-                  rep("Fully terrestrial", 2),
-                  rep("Some larvae aquatic", 2))) %>%
-  group_by(life) %>%
-  mutate(mean_p = mean(Estimate)) %>%
-  ungroup() %>%
-  mutate(life = fct_reorder(life, mean_p),
-         method = case_when(method == "S" ~ "Spray",
-                            method == "R" ~ "Roller"))
-         
-(life_plot2 <- 
-life_fits_df %>%
-  ggplot() +
-  geom_point(aes(y = life, x = 100*Estimate, color = method, 
-                 group = method),
-             position = position_dodge(width = .75),
-             size = 2) +
-  geom_errorbar(aes(y = life, xmin = 100*Q10, 
-                    xmax = 100*Q90, color = method,
-                    group = method),
-                size = 1,
-                position = position_dodge(width = .75),
-                width = 0) +
-  geom_errorbar(aes(y = life, xmin = 100*Q2.5, 
-                    xmax = 100*Q97.5, color = method,
-                    group = method),
-                position = position_dodge(width = .75),
-                width = 0) +
-  scale_color_manual(values = c("steelblue", "firebrick")) +
-  labs(color = "",
-       y = "",
-       x = "% of families",
-       title = "Life mode") +
-  theme_bw() +
-  theme(text = element_text(size = 13),
-        legend.position = c(.8,.2))
-)
-
-### Body size
-
-# load the models so we don't have to refit them each time
-size.method.tree <- readRDS("output/size_multinomial_method.tree.rds")
-size.method <- readRDS("output/size_multinomial_method.rds")
-size.tree <- readRDS("output/size_multinomial_tree.rds")
-
-# plot top model predictions
-fit.newdata = expand.grid(method = c("S", "R"),
-                                 size = 1)
-
-fitsies <- fitted(size.method, 
-                  newdata = fit.newdata,probs = c(0.025, 0.1,
-                                                  0.9, 0.975))
-
-fitsies
-
-fitsies.list <- list()
-for(i in 1:dim(fitsies)[3]){
-  fitsies.list[[i]] <- fitsies[,,i]
-}
-
-size_fits_df <- do.call(rbind, fitsies.list) %>%
-  as.data.frame() %>%
-  mutate(method = rep(fit.newdata$method, 4),
-         size = c(rep("< 5 mm", 2),
-                  rep("> 20 mm", 2),
-                  rep("10-20 mm", 2),
-                  rep("5-10 mm", 2))) %>%
-  group_by(size) %>%
-  mutate(mean_p = mean(Estimate)) %>%
-  ungroup() %>%
-  mutate(size = fct_reorder(size, mean_p),
-         method = case_when(method == "S" ~ "Spray",
-                            method == "R" ~ "Roller"))
-         
-(size_plot2 <- 
-size_fits_df %>%
-  ggplot() +
-  geom_point(aes(y = size, x = 100*Estimate, color = method, 
-                 group = method),
-             position = position_dodge(width = .5),
-             size = 2) +
-  geom_errorbar(aes(y = size, xmin = 100*Q10, 
-                    xmax = 100*Q90, color = method,
-                    group = method),
-                size = 1,
-                position = position_dodge(width = .5),
-                width = 0) +
-  geom_errorbar(aes(y = size, xmin = 100*Q2.5, 
-                    xmax = 100*Q97.5, color = method,
-                    group = method),
-                position = position_dodge(width = .5),
-                width = 0) +
-  scale_color_manual(values = c("steelblue", "firebrick")) +
-  labs(color = "",
-       y = "",
-       x = "% of families",
-       title = "Body size") +
-  theme_bw() +
-  theme(text = element_text(size = 13),
-        legend.position = c(.8,.2))
-)
-
-### Combine all 3 plots with patchwork
-feed_plot2 / life_plot2 / size_plot2
-
-ggsave("figures/PlotL_guilds_multinom3.jpg", 
-       width = 5, height = 12, dpi = 400)
-```
-
-
-
-
-
-
 # Plots of rarefied species richness, shannon & simpson indexes, relative read frequency by primer
 ```{r}
 # MOTU rarefied species richness by sample and primer set
@@ -3312,16 +3462,4 @@ ggsave("figures/primer_compare6.png", width = 7, height = 7, dpi = 400)
 
 ```
 
-# Examining reference databases
-```{r}
-
-library(data.table)
-
-cref <- fread("data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.C.tsv") %>%
-  mutate(len = nchar(sequence))
-
-zref <- fread("data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.Z.tsv") %>%
-  mutate(len = nchar(sequence))
-
-```
 
