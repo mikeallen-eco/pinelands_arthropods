@@ -798,26 +798,40 @@ annfont <- 2
 ytextsize = 10
 xtextsize = 11
 
-# Richness stats
-# rarefy_stats <- rarefy_df_wide %>%
-#   mutate(lc = log(coleop_S),
-#          lz = log(zeale_S)) %>%
-#   summarize(mean_lc = mean(lc),
-#             sd_lc = sd(lc),
-#             n_lc = length(lc),
-#             se_lc = sd_lc/sqrt(n_lc),
-#             lcl_lc = mean_lc - 2*se_lc,
-#             ucl_lc = mean_lc + 2*se_lc,
-#             mean_lz = mean(lz),
-#             sd_lz = sd(lz),
-#             n_lz = length(lz),
-#             se_lz = sd_lz/sqrt(n_lz),
-#             lcl_lz = mean_lz - 2*se_lz,
-#             ucl_lz = mean_lz + 2*se_lz)
-# 
-# exp(rarefy_stats)
+# Richness model
+  
+  summary(lm(log(S) ~ tree + method + primer, data = rarefy_df20))
+  library(brms)
+# (Smod <- brm(log(S) ~ tree + method + primer, data = rarefy_df20, cores = 4))
+# saveRDS(Smod, "output/Smod.rds")
+Smod <- readRDS("output/Smod.rds")
+#                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# Intercept            3.46      0.11     3.23     3.67 1.00     4660     3023
+# treeDeciduous        0.22      0.12    -0.02     0.45 1.00     4327     3221*
+# methodUnderstory     0.63      0.12     0.39     0.87 1.00     4553     2688***
+# primerCOI           -0.80      0.12    -1.03    -0.56 1.00     5009     2910***
 
-# Richness boxplots
+quantile(spread_draws(Smod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
+# 0.02981399 0.41628926 
+quantile(spread_draws(Smod, b_methodUnderstory)$b_methodUnderstory, c(0.005, 0.995)) 
+# 0.3304864 0.9484978 
+quantile(spread_draws(Smod, b_primerCOI)$b_primerCOI, c(0.005, 0.995)) 
+-1.098370 -0.478974
+Smod.pred <- predict(Smod, 
+                         newdata = expand.grid(tree = c("Coniferous", "Deciduous"),
+                                    primer = c("COI", "16S"),
+                                    method = c("Understory", "Bark")),
+                     probs = c(0.025,0.1,0.9,0.975)) %>%
+  bind_cols(expand.grid(tree = c("Coniferous", "Deciduous"),
+                                    primer = c("COI", "16S"),
+                                    method = c("Understory", "Bark")))
+
+stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-1.03, -0.56]***",
+           "\nUnderstory vs. Bark: [0.39, 0.87]***",
+           "\nDeciduous vs. Conifer: [-0.02, 0.45]*\n \n \n ")
+S.anntext <- data.frame(primer = c("16S", "COI"),
+                        txt = c(stxt, ""))
+
 library(wesanderson)
 (rareS.plot <- 
 rarefy_df20 %>%
@@ -841,41 +855,50 @@ rarefy_df20 %>%
         axis.text.x = element_text(size = xtextsize),
         legend.position = c(0.85, 0.81)) +
   labs(x = "",
-       y = "Rarefied MOTU richness",
+       y = "MOTU richness",
        fill = "",
-       color = "") 
+       color = "") +
+  guides(fill = "none", color = "none") +
+  geom_text(aes(x = 0.5, y = -40, label = txt),
+           hjust = 0,
+           data = S.anntext,
+           size = annfont,
+           color = "black")
   )
-  
-  summary(lm(log(S) ~ tree + method + primer, data = rarefy_df20))
-#                  Estimate Std. Error t value Pr(>|t|)    
-# (Intercept)        3.4562     0.1096  31.535  < 2e-16 ***
-# treeDeciduous      0.2204     0.1165   1.892   0.0635 .  
-# methodUnderstory   0.6293     0.1216   5.174 2.99e-06 ***
-# primerCOI         -0.8027     0.1163  -6.903 4.26e-09 ***
-# Residual standard error: 0.4578 on 58 degrees of freedom
-# Multiple R-squared:  0.571,	Adjusted R-squared:  0.5488 
-# F-statistic: 25.73 on 3 and 58 DF,  p-value: 1.032e-10
 
-# Evenness stats
-# simpson_stats <- simpson_df20 %>%
-#   mutate(lc = coleop_simpson,
-#          lz = zeale_simpson) %>%
-#   summarize(mean_lc = mean(lc),
-#             sd_lc = sd(lc),
-#             n_lc = length(lc),
-#             se_lc = sd_lc/sqrt(n_lc),
-#             lcl_lc = mean_lc - 2*se_lc,
-#             ucl_lc = mean_lc + 2*se_lc,
-#             mean_lz = mean(lz),
-#             sd_lz = sd(lz),
-#             n_lz = length(lz),
-#             se_lz = sd_lz/sqrt(n_lz),
-#             lcl_lz = mean_lz - 2*se_lz,
-#             ucl_lz = mean_lz + 2*se_lz)
-# 
-# simpson_stats
-  
+# Evenness model
+
+  library(brms)
+# (Simpmod <- brm(simpson ~ tree + method + primer, data = simpson_df20, cores = 4))
+# saveRDS(Simpmod, "output/Simpmod.rds")
+Simpmod <- readRDS("output/Simpmod.rds")
+#                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# Intercept            0.49      0.07     0.36     0.63 1.00     4517     2846
+# treeDeciduous        0.09      0.07    -0.05     0.23 1.00     5137     3015
+# methodUnderstory     0.13      0.08    -0.02     0.28 1.00     4664     3269
+# primerCOI           -0.14      0.07    -0.28     0.01 1.00     4858     2851
+library(tidybayes)
+get_variables(Simpmod)
+quantile(spread_draws(Simpmod, b_treeDeciduous)$b_treeDeciduous, c(0.1, 0.9)) 
+quantile(spread_draws(Simpmod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
+# -0.003726669  0.180836298
+# -0.02875764  0.20412008
+quantile(spread_draws(Simpmod, b_methodUnderstory)$b_methodUnderstory, c(0.1, 0.9))
+quantile(spread_draws(Simpmod, b_methodUnderstory)$b_methodUnderstory, c(0.05, 0.95))
+# 0.0332670 0.2254042 
+# 0.0053226 0.2500290
+quantile(spread_draws(Simpmod, b_primerCOI)$b_primerCOI, c(0.1, 0.9))
+quantile(spread_draws(Simpmod, b_primerCOI)$b_primerCOI, c(0.05, 0.95))
+# -0.22897201 -0.04530457
+# -0.25429179 -0.02037915
+
 # Evenness boxplots
+stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.28, 0.01]*",
+           "\nUnderstory vs. Bark: [-0.02, 0.28]*",
+           "\nDeciduous vs. Conifer: [-0.05, 0.23]\n \n \n ")
+S.anntext <- data.frame(primer = c("16S", "COI"),
+                        txt = c(stxt, ""))
+
 (rareSimpson.plot <- 
 simpson_df20 %>%
   ggplot() + # aes(x = method, y = value)
@@ -883,6 +906,8 @@ simpson_df20 %>%
               alpha = 0.6) +
     facet_wrap(~primer) +
   geom_point(size = 3, alpha = .75, aes(x = method, y = simpson, color = tree),
+             position = position_dodge(width = .9)) +  
+  geom_point(size = 2, alpha = 1, aes(x = method, y = simpson, color = tree),
              position = position_dodge(width = .9)) +  
     scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
   scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
@@ -895,39 +920,54 @@ simpson_df20 %>%
        y = "MOTU evenness (Simpson)",
        fill = "",
        color = "") +
-    guides(fill = "none", color = "none")
+    guides(fill = "none", color = "none") +
+  geom_text(aes(x = 0.5, y = -.42, label = txt),
+           hjust = 0,
+           data = S.anntext,
+           size = annfont,
+           color = "black")
   )
-
-summary(lm(simpson ~ tree + method + primer, data = simpson_df20))
-#                  Estimate Std. Error t value Pr(>|t|)    
-# (Intercept)       0.49111    0.06543   7.506 4.13e-10 ***
-# treeDeciduous     0.08899    0.06952   1.280   0.2056    
-# methodUnderstory  0.12953    0.07262   1.784   0.0797 .  
-# primerCOI        -0.13784    0.06942  -1.986   0.0518 .  
-# Residual standard error: 0.2733 on 58 degrees of freedom
-# Multiple R-squared:  0.1288,	Adjusted R-squared:  0.08371 
-# F-statistic: 2.858 on 3 and 58 DF,  p-value: 0.04473
   
-# Diversity stats
-# shannon_stats <- shannon_df %>%
-#   mutate(lc = coleop_shannon,
-#          lz = zeale_shannon) %>%
-#   summarize(mean_lc = mean(lc),
-#             sd_lc = sd(lc),
-#             n_lc = length(lc),
-#             se_lc = sd_lc/sqrt(n_lc),
-#             lcl_lc = mean_lc - 2*se_lc,
-#             ucl_lc = mean_lc + 2*se_lc,
-#             mean_lz = mean(lz),
-#             sd_lz = sd(lz),
-#             n_lz = length(lz),
-#             se_lz = sd_lz/sqrt(n_lz),
-#             lcl_lz = mean_lz - 2*se_lz,
-#             ucl_lz = mean_lz + 2*se_lz)
-# 
-# shannon_stats
+# Diversity model
+ library(brms)
+# (Shanmod <- brm(shannon ~ tree + method + primer, data = shannon_df20, cores = 4))
+# saveRDS(Shanmod, "output/Shanmod.rds")
+Shanmod <- readRDS("output/Shanmod.rds")
 
-# Diversity boxplots
+library(tidybayes)
+get_variables(Shanmod)
+quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
+quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.025, 0.975)) 
+quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.005, 0.995)) 
+# -0.04759738  0.61697714 
+# -0.1173273  0.6787115
+# -0.2453262 0.8106203 
+quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.1, 0.9))
+quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.05, 0.95))
+quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.995, 0.005))
+# 0.3700738 0.9112348 
+# 0.2870847 0.9986466 
+# 1.21595340 0.05807239 
+quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.1, 0.9))
+quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.05, 0.95))
+quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.995, 0.005))
+# -0.6440111 -0.1107877 
+# -0.72093485 -0.03081384 
+#  0.1543796 -0.9289227 
+
+#                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# Intercept            1.14      0.20     0.75     1.52 1.00     4381     2944
+# treeDeciduous        0.28      0.20    -0.12     0.68 1.00     4737     3025
+# methodUnderstory     0.64      0.22     0.21     1.06 1.00     4795     2964
+# primerCOI           -0.38      0.21    -0.79     0.04 1.00     5602     2421
+
+# Shannon plot
+stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.79, 0.04]*",
+           "\nUnderstory vs. Bark: [0.21, 1.06]***",
+           "\nDeciduous vs. Conifer: [-0.12, 0.68]\n \n \n ")
+S.anntext <- data.frame(primer = c("16S", "COI"),
+                        txt = c(stxt, ""))
+
 (rareShannon.plot <- 
 shannon_df20 %>%
   ggplot() + # aes(x = method, y = value)
@@ -938,33 +978,34 @@ shannon_df20 %>%
              position = position_dodge(width = .9)) +  
     scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
   scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
+    scale_y_continuous(breaks = c(0,1,2,3)) +
   theme_bw() +
   theme(text = element_text(size = 14),
         axis.title.y = element_text(size = ytextsize),
         axis.text.x = element_text(size = xtextsize),
-        legend.position = c(0.85, 0.86)) +
+        legend.position = c(0.87, 0.18),
+        legend.background = element_rect(fill = "transparent")) +
   labs(x = "",
        y = "MOTU diversity (Shannon)",
        fill = "",
        color = "") +
-    guides(fill = "none", color = "none")
+  geom_text(aes(x = 0.5, y = -1.7, label = txt),
+           hjust = 0,
+           data = S.anntext,
+           size = annfont,
+           color = "black") +
+  theme(legend.key.size = unit(.22, 'cm'), #change legend key size
+        legend.key.height = unit(.22, 'cm'), #change legend key height
+        legend.key.width = unit(.22, 'cm'), #change legend key width
+        legend.title = element_text(size=8), #change legend title font size
+        legend.text = element_text(size=8))
   )
-
-summary(lm(shannon ~ tree + method + primer, data = shannon_df20))
-#                  Estimate Std. Error t value Pr(>|t|)    
-# (Intercept)        1.1353     0.1911   5.942  1.7e-07 ***
-# treeDeciduous      0.2763     0.2030   1.361  0.17875    
-# methodUnderstory   0.6503     0.2120   3.067  0.00328 ** 
-# primerCOI         -0.3719     0.2027  -1.834  0.07173 .  
-# Residual standard error: 0.7981 on 58 degrees of freedom
-# Multiple R-squared:  0.1976,	Adjusted R-squared:  0.1561 
-# F-statistic:  4.76 on 3 and 58 DF,  p-value: 0.004918
 
 library(patchwork)
 
-rareS.plot / rareSimpson.plot / rareShannon.plot
+rareShannon.plot / rareS.plot / rareSimpson.plot 
 
-ggsave("figures/rev_Fig2_rarefieddiv_20k.png", width = 5, height = 7, dpi = 400)
+ggsave("figures/rev_Fig2_rarefieddiv_20k15.png", width = 4.5, height = 7, dpi = 400)
 ```
 # Fig. 3A - NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
 ```{r}

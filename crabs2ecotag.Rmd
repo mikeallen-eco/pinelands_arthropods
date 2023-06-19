@@ -78,7 +78,7 @@ for (i in 1:nrow(crab_db.C)) {
 
         # write it in db_file
         output_file.C <- file(output_ref_db.C, open = "at")
-        writeLines(text = paste(">",as.character(crab_db.C$seqID[i]),"; species_name=",gsub(as.character(crab_db.C$species[i]),pattern="_",replacement = " "),
+        writeLines(text = paste(">",as.character(crab_db.C$seqID[i])," species_name=",gsub(as.character(crab_db.C$species[i]),pattern="_",replacement = " "),
                                 "; rank=",as.character(crab_db.C$rank[i]),"; origin = bld_gb; taxid=",as.integer(crab_db.C$taxid[i]),";",sep=""),
                    con = output_file.C)
         writeLines(text = gsub("-","",as.character(crab_db.C$sequence[i])), con = output_file.C)
