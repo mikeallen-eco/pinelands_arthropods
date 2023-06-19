@@ -4,7 +4,6 @@ Second field effort testing roller and spray aggregation methods with n = 20 sam
 # Load libraries. Read, clean and format data
 ```{r}
 library(dplyr)
-# library(metacoder)
 library(readxl)
 library(ggplot2)
 library(stringr)
@@ -23,31 +22,13 @@ tax_data_path <- "data/arthropod.families_20220816.xlsx"
 #   but hadn't received new families from 4methods yet
 '%notin%' <- Negate('%in%')
 
-# read in family name look up 
-    # will use to match each OTU with an NCBI family name
-    # created by looking up each entry in NCBI if it didn't 
-      # have a family name yet from bioinformatics work
-# famlookup <- read_xlsx(tax_data_path,
-#                        sheet = "arthropod.families") %>%
-#   select(final_lowest,
-#          final_ID = 'final species_name',
-#          family:kingdom) %>%
-#   distinct()
-
 # read in Zeale & Coleop MOTU data with taxonomy
   # excludes MOTUs that were filtered out during negative subtraction etc.
-zs3 <- read.csv("data/pinebugs.samples.step2.onlyarth.negsub.Z.csv") %>%
-  rowwise() %>% 
-  mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
-  ungroup() %>%
-  filter(sample.sum != 0) %>%
-  select(-sample.sum)
-cs3 <- read.csv("data/pinebugs.samples.step2.onlyarth.negsub.C.csv") %>%
-  rowwise() %>% 
-  mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
-  ungroup() %>%
-  filter(sample.sum != 0) %>%
-  select(-sample.sum)
+zs3 <- read.csv("data/pinebugs.samples.onlyarth.negsub.Z.csv") %>%
+  filter(sampsum != 0)
+
+cs3 <- read.csv("data/pinebugs.samples.onlyarth.negsub.C.csv") %>%
+  filter(sampsum != 0)
 
 # read in family trait info (life mode)
     # note: class and order added with taxize package using script:
@@ -142,6 +123,9 @@ diet <- read_xlsx(tax_data_path,
                                 "zoophagous-predator" ~
                                 "Predator",
                               diet.cat == 
+                                "zoophagous-mixed" ~
+                                "Predator",
+                              diet.cat == 
                                 "multiple categories" ~
                                 "Mulitple categories",
                               diet.cat == 
@@ -150,6 +134,7 @@ diet <- read_xlsx(tax_data_path,
                               TRUE ~ diet.cat))
 
 table(diet$diet.cat)
+table(diet$diet.cat2)
 # final category notes: 
 # detritophagous/scavenger = detrit., copro., sapro., and zoo.-necro.
 
@@ -179,11 +164,12 @@ art_full <- cs3 %>%
   mutate(primer = "coleop") %>%
   bind_rows(mutate(zs3, primer = "zeale")) %>%
   select(primer, id, phylum, class, order, family, 
-         genus, sci, contains("CS")[c(2:10,1)], contains("DS")[c(2:7,1)],
-         contains("CR")[c(2:10,1)], contains("DR")[c(2:10,1)]) %>%
-  rowwise() %>% 
-  mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
-  ungroup() %>%
+         genus, species, contains("CS")[c(2:10,1)], contains("DS")[c(2:7,1)],
+         contains("CR")[c(2:10,1)], contains("DR")[c(2:10,1)], sampsum) %>%
+  # rowwise() %>% 
+  # mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
+  # ungroup() %>%
+  rename(sample.sum = sampsum) %>%
   mutate(sample.3CS = case_when(primer == "zeale" ~ 0,
                                   TRUE ~ sample.3CS))
 
@@ -206,12 +192,12 @@ colnames(art_full) # check that it worked
 sort(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample")), na.rm = T))
 sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample")), na.rm = T))
 
-mean(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample")), na.rm = T))
-mean(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample")), na.rm = T))
+mean(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"), -sample.sum), na.rm = T))
+mean(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T))
 
 # make family-lineage lookup table
 lineage_lookup <- art_full %>%
-  dplyr::select(phylum, class, order, family, genus, sci) %>%
+  dplyr::select(phylum, class, order, family, genus, species) %>%
   distinct()
 
 # format MOTU database for use in sp accum 
@@ -270,13 +256,12 @@ art_gen_motus <- art_full %>%
   select(genus, ends_with("coleop"), ends_with("zeale"))
 
 art_sp_reads <- art_full %>%
-  filter(genus != "NA" & is.na(genus)==F & (genus != sci) & 
-           (sci != "Paria ") & (sci != "Lucilia ")) %>% # this part fixes 2 typos in sci
-  group_by(primer, sci) %>%
+  filter(species != "NA" & is.na(species)==F) %>% # this part fixes 2 typos in sci
+  group_by(primer, species) %>%
   summarise(across(starts_with("sample"), sum),
             .groups = "drop") %>%
   pivot_wider(names_from = primer, values_from = starts_with("sample")) %>%
-  select(sci, ends_with("coleop"), ends_with("zeale"))
+  select(species, ends_with("coleop"), ends_with("zeale"))
 
 #### Format data for accumulation curves
 
@@ -304,7 +289,7 @@ rollZ_motu_mat[rollZ_motu_mat>0] <- 1
 colnames(rollZ_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "Z"))$id
 
 # both - zeale - sp level
-zeromat.motu.Z <- matrix(0,1,420)
+zeromat.motu.Z <- matrix(0,1,645)
 sprayZ_motu_mat2 <- rbind(sprayZ_motu_mat[1:2,],
                          zeromat.motu.Z,
                          sprayZ_motu_mat[3:9,],
@@ -339,7 +324,7 @@ rollC_motu_mat[rollC_motu_mat>0] <- 1
 colnames(rollC_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "C"))$id
 
 # both - coleop - motu level
-zeromat.motu.C <- matrix(0,1,645)
+zeromat.motu.C <- matrix(0,1,1026)
 sprayC_motu_mat2 <- rbind(sprayC_motu_mat[1:10,],
                          zeromat.motu.C,
                          sprayC_motu_mat[11,],
@@ -359,7 +344,7 @@ sprayZ_sp_mat <- art_sp_reads %>%
   t()
 sprayZ_sp_mat[is.na(sprayZ_sp_mat)] <- 0 
 sprayZ_sp_mat[sprayZ_sp_mat>0] <- 1 
-colnames(sprayZ_sp_mat) <- art_sp_reads$sci
+colnames(sprayZ_sp_mat) <- art_sp_reads$species
 
 # roller samples - zeale - sp level
 rollZ_sp_mat <- art_sp_reads %>%
@@ -368,10 +353,10 @@ rollZ_sp_mat <- art_sp_reads %>%
   t()
 rollZ_sp_mat[is.na(rollZ_sp_mat)] <- 0 
 rollZ_sp_mat[rollZ_sp_mat>0] <- 1 
-colnames(rollZ_sp_mat) <- art_sp_reads$sci
+colnames(rollZ_sp_mat) <- art_sp_reads$species
 
 # both - zeale - sp level
-zeromat.sp <- matrix(0,1,237)
+zeromat.sp <- matrix(0,1,271)
 sprayZ_sp_mat2 <- rbind(sprayZ_sp_mat[1:2,],
                          zeromat.sp,
                          sprayZ_sp_mat[3:9,],
@@ -392,7 +377,7 @@ sprayC_sp_mat <- art_sp_reads %>%
   t()
 sprayC_sp_mat[is.na(sprayC_sp_mat)] <- 0 
 sprayC_sp_mat[sprayC_sp_mat>0] <- 1 
-colnames(sprayC_sp_mat) <- art_sp_reads$sci
+colnames(sprayC_sp_mat) <- art_sp_reads$species
 
 # roller samples - coleop - sp level
 rollC_sp_mat <- art_sp_reads %>%
@@ -401,7 +386,7 @@ rollC_sp_mat <- art_sp_reads %>%
   t()
 rollC_sp_mat[is.na(rollC_sp_mat)] <- 0 
 rollC_sp_mat[rollC_sp_mat>0] <- 1 
-colnames(rollC_sp_mat) <- art_sp_reads$sci
+colnames(rollC_sp_mat) <- art_sp_reads$species
 
 # both - coleop - sp level
 sprayC_sp_mat2 <- rbind(sprayC_sp_mat[1:10,],
@@ -435,7 +420,7 @@ rollZ_gen_mat[rollZ_gen_mat>0] <- 1
 colnames(rollZ_gen_mat) <- art_gen_reads$genus
 
 # both - zeale - genus level
-zeromat.gen <- matrix(0,1,307)
+zeromat.gen <- matrix(0,1,355)
 sprayZ_gen_mat2 <- rbind(sprayZ_gen_mat[1:2,],
                          zeromat.gen,
                          sprayZ_gen_mat[3:9,],
@@ -499,7 +484,7 @@ rollZ_fam_mat[rollZ_fam_mat>0] <- 1
 colnames(rollZ_fam_mat) <- art_fam_reads$family
 
 # both - zeale - family level
-zeromat <- matrix(0,1,171)
+zeromat <- matrix(0,1,180)
 sprayZ_fam_mat2 <- rbind(sprayZ_fam_mat[1:2,],
                          zeromat,
                          sprayZ_fam_mat[3:9,],
@@ -550,8 +535,8 @@ genct <- art_gen_reads %>%
   filter(!((sample.sum_coleop == 0) & (sample.sum_zeale == 0)))
 
 # read counts by unique taxon
-readsC = cs3 %>% group_by(sci) %>% summarize(count = sum(count))
-readsZ = zs3 %>% group_by(sci) %>% summarize(count = sum(count))
+readsC = cs3 %>% group_by(phylum, class, order, family, genus, species) %>% summarize(count = sum(count))
+readsZ = zs3 %>% group_by(phylum, class, order, family, genus, species) %>% summarize(count = sum(count))
 
 ```
 # Fig. 1 - construct accumulation curves using iNEXT
@@ -645,8 +630,8 @@ ggiNEXT(accum.fam, type=1, se=TRUE, facet.var="None", color.var="Assemblage", gr
 
 library(patchwork)
 (motuplot + spplot) / (genplot + famplot)
-# ggsave("figures/rev1_accumcurves5.png", width = 12, height = 5, dpi = 400) # 3-panel
-ggsave("figures/rev_Fig1_accumcurves11.png", width = 12, height = 10, dpi = 400) # 4-panel
+# ggsave("figures/rev1_accumcurves.png", width = 12, height = 5, dpi = 400) # 3-panel
+ggsave("figures/rev_Fig1_accumcurves.swarm1.png", width = 12, height = 10, dpi = 400) # 4-panel
 
 ```
 # Fig. 2 - Richness, diversity, evenness - by substrate, tree type, primer
