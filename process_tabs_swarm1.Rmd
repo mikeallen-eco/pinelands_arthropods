@@ -525,7 +525,7 @@ full_taxa_lookup <- read.csv("data/full_tax_lookup1.csv") %>%
 zz_finID <- zz_fin  %>%
   left_join(full_taxa_lookup, by = join_by(finaltax)) %>%
   select(id, finaltax, ecotagID, ecotagmatch, bestblastmatch, bestmatch, phylum, class, order, family, genus, species,
-         count, wt, starts_with("sample"), sequence) %>%
+         count, wt, starts_with("sample"), sequence, blastnotes) %>%
   mutate(genus = case_when(bestmatch < 0.98 ~ NA,
                            TRUE ~ genus),
          species = case_when(bestmatch < 0.99 ~ NA,
@@ -541,7 +541,18 @@ zz_finID <- zz_fin  %>%
                                     is.na(species) & !is.na(genus) ~ genus,
                                     !is.na(species) ~ species)) %>%
   select(id, finalID, bestmatch, phylum, class, order, family, genus, species,
-         count, wt, starts_with("sample"), sequence) 
+         count, wt, starts_with("sample"), sequence, finaltax, blastnotes) 
+
+# check to make sure all species level matches got a species in the final database
+checkIDsZ = zz_finID %>% 
+  select(id, bestmatch, finaltax, species, finalID, blastnotes) %>%
+  filter(bestmatch > 0.99,
+         is.na(species)) %>%
+  arrange(desc(nchar(finaltax)))
+  # note: this revealed ~ possible errors in which final_taxa_lookup didn't include species when it should have
+    # that suggests that you can't rely on taxize get_taxa blindly without checking it carefully
+    # for now, I manually updated the final_taxa_lookup table to correct these errors
+zz_finID <- zz_finID %>% select(-finaltax, -blastnotes)
 
 # check which columns are negatives
 colnames(zz_finID) # input those column numbers in the next line
@@ -576,7 +587,7 @@ zn$seqmax <- apply(zn[,12:17],1, max)
 cc_finID <- cc_fin  %>%
   left_join(full_taxa_lookup, by = join_by(finaltax)) %>%
   select(id, finaltax, ecotagmatch, bestblastmatch, bestmatch, phylum, class, order, family, genus, species,
-         count, wt, starts_with("sample"), sequence) %>%
+         count, wt, starts_with("sample"), sequence, blastnotes) %>%
   mutate(genus = case_when(bestmatch < 0.98 ~ NA,
                            TRUE ~ genus),
          species = case_when(bestmatch < 0.99 ~ NA,
@@ -592,7 +603,17 @@ cc_finID <- cc_fin  %>%
                                     is.na(species) & !is.na(genus) ~ genus,
                                     !is.na(species) ~ species)) %>%
   select(id, finalID, bestmatch, phylum, class, order, family, genus, species,
-         count, wt, starts_with("sample"), sequence) 
+         count, wt, starts_with("sample"), sequence, finaltax, blastnotes) 
+
+# check to make sure all species level matches got a species in the final database
+checkIDsC = cc_finID %>% 
+  select(id, bestmatch, finaltax, species, finalID, blastnotes) %>%
+  filter(bestmatch > 0.99,
+         is.na(species)) %>%
+  arrange(desc(nchar(finaltax)))
+  # note: this revealed 5 errors in which final_taxa_lookup didn't include species when it should have
+    # that suggests that you can't rely on taxize get_taxa blindly without checking it carefully
+cc_finID <- cc_finID %>% select(-finaltax, -blastnotes)
 
 # check which columns are negatives
 colnames(cc_finID) # input those column numbers in the next line

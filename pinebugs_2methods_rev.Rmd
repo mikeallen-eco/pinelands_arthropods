@@ -7,7 +7,6 @@ library(dplyr)
 library(readxl)
 library(ggplot2)
 library(stringr)
-# library(taxa)
 # library(vegan)
 library(BiodiversityR)
 library(wesanderson)
@@ -166,9 +165,6 @@ art_full <- cs3 %>%
   select(primer, id, phylum, class, order, family, 
          genus, species, contains("CS")[c(2:10,1)], contains("DS")[c(2:7,1)],
          contains("CR")[c(2:10,1)], contains("DR")[c(2:10,1)], sampsum) %>%
-  # rowwise() %>% 
-  # mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
-  # ungroup() %>%
   rename(sample.sum = sampsum) %>%
   mutate(sample.3CS = case_when(primer == "zeale" ~ 0,
                                   TRUE ~ sample.3CS))
@@ -193,7 +189,16 @@ sort(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"))
 sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample")), na.rm = T))
 
 mean(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"), -sample.sum), na.rm = T))
-mean(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T))
+mean(sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T))[2:37])
+
+csd <- sd(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"), -sample.sum), na.rm = T))
+zsd <- sd(sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T))[2:37])
+
+cn <- sum(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"), -sample.sum), na.rm = T)>0)
+zn <- sum(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T)>0)
+
+(cse <- csd/sqrt(cn))
+(zse <- zsd/sqrt(zn))
 
 # make family-lineage lookup table
 lineage_lookup <- art_full %>%
@@ -324,7 +329,7 @@ rollC_motu_mat[rollC_motu_mat>0] <- 1
 colnames(rollC_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "C"))$id
 
 # both - coleop - motu level
-zeromat.motu.C <- matrix(0,1,1026)
+zeromat.motu.C <- matrix(0,1,1025)
 sprayC_motu_mat2 <- rbind(sprayC_motu_mat[1:10,],
                          zeromat.motu.C,
                          sprayC_motu_mat[11,],
@@ -356,7 +361,7 @@ rollZ_sp_mat[rollZ_sp_mat>0] <- 1
 colnames(rollZ_sp_mat) <- art_sp_reads$species
 
 # both - zeale - sp level
-zeromat.sp <- matrix(0,1,271)
+zeromat.sp <- matrix(0,1,270)
 sprayZ_sp_mat2 <- rbind(sprayZ_sp_mat[1:2,],
                          zeromat.sp,
                          sprayZ_sp_mat[3:9,],
@@ -400,6 +405,18 @@ sprayC_sp_mat2 <- rbind(sprayC_sp_mat[1:10,],
 bothC_sp_mat <- sprayC_sp_mat2 + rollC_sp_mat
 bothC_sp_mat[bothC_sp_mat>0] <- 1
 
+# pool all primers and sampling methods - species level
+bothCZ_sp_mat <- bothC_sp_mat + bothZ_sp_mat
+bothCZ_sp_mat[bothCZ_sp_mat>0] <- 1
+
+# pooled roller samples - species level
+roll_sp_mat <- rollC_sp_mat + rollZ_sp_mat
+roll_sp_mat[roll_sp_mat>0] <- 1
+
+# pooled spray samples - species level
+spray_sp_mat <- sprayC_sp_mat2 + sprayZ_sp_mat2
+spray_sp_mat[spray_sp_mat>0] <- 1
+
 # spray samples - zeale - genus level
 sprayZ_gen_mat <- art_gen_reads %>%
   select(contains("CS"), contains("DS")) %>%
@@ -420,7 +437,7 @@ rollZ_gen_mat[rollZ_gen_mat>0] <- 1
 colnames(rollZ_gen_mat) <- art_gen_reads$genus
 
 # both - zeale - genus level
-zeromat.gen <- matrix(0,1,355)
+zeromat.gen <- matrix(0,1,354)
 sprayZ_gen_mat2 <- rbind(sprayZ_gen_mat[1:2,],
                          zeromat.gen,
                          sprayZ_gen_mat[3:9,],
@@ -464,6 +481,18 @@ sprayC_gen_mat2 <- rbind(sprayC_gen_mat[1:10,],
 bothC_gen_mat <- sprayC_gen_mat2 + rollC_gen_mat
 bothC_gen_mat[bothC_gen_mat>0] <- 1
 
+# pool all primers and sampling methods - genus level
+bothCZ_gen_mat <- bothC_gen_mat + bothZ_gen_mat
+bothCZ_gen_mat[bothCZ_gen_mat>0] <- 1
+
+# pooled roller samples - genus level
+roll_gen_mat <- rollC_gen_mat + rollZ_gen_mat
+roll_gen_mat[roll_gen_mat>0] <- 1
+
+# pooled spray samples - genus level
+spray_gen_mat <- sprayC_gen_mat2 + sprayZ_gen_mat2
+spray_gen_mat[spray_gen_mat>0] <- 1
+
 # spray samples - zeale - family level
 sprayZ_fam_mat <- art_fam_reads %>%
   select(contains("CS"), contains("DS")) %>%
@@ -484,7 +513,7 @@ rollZ_fam_mat[rollZ_fam_mat>0] <- 1
 colnames(rollZ_fam_mat) <- art_fam_reads$family
 
 # both - zeale - family level
-zeromat <- matrix(0,1,180)
+zeromat <- matrix(0,1,179)
 sprayZ_fam_mat2 <- rbind(sprayZ_fam_mat[1:2,],
                          zeromat,
                          sprayZ_fam_mat[3:9,],
@@ -528,6 +557,18 @@ sprayC_fam_mat2 <- rbind(sprayC_fam_mat[1:10,],
 bothC_fam_mat <- sprayC_fam_mat2 + rollC_fam_mat
 bothC_fam_mat[bothC_fam_mat>0] <- 1
 
+# pool all primers and sampling methods - family level
+bothCZ_fam_mat <- bothC_fam_mat + bothZ_fam_mat
+bothCZ_fam_mat[bothCZ_fam_mat>0] <- 1
+
+# pooled roller samples - family level
+roll_fam_mat <- rollC_fam_mat + rollZ_fam_mat
+roll_fam_mat[roll_fam_mat>0] <- 1
+
+# pooled spray samples - family level
+spray_fam_mat <- sprayC_fam_mat2 + sprayZ_fam_mat2
+spray_fam_mat[spray_fam_mat>0] <- 1
+
 # counting families
 genct <- art_gen_reads %>% 
   select(genus, sample.sum_coleop, sample.sum_zeale) %>%
@@ -539,7 +580,246 @@ readsC = cs3 %>% group_by(phylum, class, order, family, genus, species) %>% summ
 readsZ = zs3 %>% group_by(phylum, class, order, family, genus, species) %>% summarize(count = sum(count))
 
 ```
-# Fig. 1 - construct accumulation curves using iNEXT
+# Fig. 1 take 2 - accumulation curves using iNEXT
+```{r}
+
+# format data for iNEXT
+accum.data.motu <- list('Understory (COI)' = t(sprayZ_motu_mat),
+                 'Bark (COI)' = t(rollZ_motu_mat),
+                 'Both substrates (COI)' = t(bothZ_motu_mat),
+                 'Understory (16S)' = t(sprayC_motu_mat),
+                 'Bark (16S)' = t(rollC_motu_mat),
+                 'Both substrates (16S)' = t(bothC_motu_mat))
+
+accum.data.motu.primer <- list('Primer COI' = t(bothZ_motu_mat),
+                 'Primer 16S' = t(bothC_motu_mat))
+
+accum.data.motu.sub <- list('Understory (COI)' = t(sprayZ_motu_mat),
+                 'Bark (COI)' = t(rollZ_motu_mat),
+                 'Understory (16S)' = t(sprayC_motu_mat),
+                 'Bark (16S)' = t(rollC_motu_mat))
+
+accum.data.sp.primer <- list(
+                 'Primer COI' = t(bothZ_sp_mat),
+                 'Primer 16S' = t(bothC_sp_mat),
+                 'All pooled' = t(bothCZ_sp_mat))
+
+accum.data.sp.sub <- list(
+                 'Bark' = t(roll_sp_mat),
+                 'Understory' = t(spray_sp_mat),
+                 'All pooled' = t(bothCZ_sp_mat))
+
+accum.data.gen.primer <- list(
+                 'Primer COI' = t(bothZ_gen_mat),
+                 'Primer 16S' = t(bothC_gen_mat),
+                 'All pooled' = t(bothCZ_gen_mat))
+
+accum.data.gen.sub <- list(
+                 'Bark' = t(roll_gen_mat),
+                 'Understory' = t(spray_gen_mat),
+                 'All pooled' = t(bothCZ_gen_mat))
+
+accum.data.fam.primer <- list(
+                 'Primer COI' = t(bothZ_fam_mat),
+                 'Primer 16S' = t(bothC_fam_mat),
+                 'All pooled' = t(bothCZ_fam_mat))
+
+accum.data.fam.sub <- list(
+                 'Bark' = t(roll_fam_mat),
+                 'Understory' = t(spray_fam_mat),
+                 'All pooled' = t(bothCZ_fam_mat))
+
+# run accumulation curve analyses in iNEXT
+accum.motu.primer <- iNEXT(accum.data.motu.primer, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.motu.primer$iNextEst$coverage_based
+
+accum.motu.sub <- iNEXT(accum.data.motu.sub, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.motu$iNextEst$coverage_based
+
+accum.sp.primer <- iNEXT(accum.data.sp.primer, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.sp.primer$iNextEst$coverage_based
+
+accum.sp.sub <- iNEXT(accum.data.sp.sub, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.sp.sub$iNextEst$coverage_based
+
+accum.gen.primer <- iNEXT(accum.data.gen.primer, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.gen.primer$iNextEst$coverage_based
+
+accum.gen.sub <- iNEXT(accum.data.gen.sub, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.gen.sub$iNextEst$coverage_based
+
+accum.fam.primer <- iNEXT(accum.data.fam.primer, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.fam.primer$iNextEst$coverage_based
+
+accum.fam.sub <- iNEXT(accum.data.fam.sub, q=0, datatype="incidence_raw", endpoint = 100)
+# accum.fam.sub$iNextEst$coverage_based
+
+# create plots for motu, sp, genus, family
+
+(motuplot.primer <-
+ggiNEXT(accum.motu.primer, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  scale_y_continuous(limits = c(0,2000)) +
+  labs(y = "No. MOTUs",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("darkgreen", "darkorange3")) +
+    scale_fill_manual(values = c("darkgreen", "darkorange3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        legend.key.height = unit(.07, 'cm'), #change legend key height
+        legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(motuplot.sub <-
+ggiNEXT(accum.motu.sub, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  scale_y_continuous(limits = c(0,2000)) +
+  labs(y = "",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("darkblue", "steelblue", "darkred", "indianred3")) +
+    scale_fill_manual(values = c("darkblue", "steelblue", "darkred", "indianred3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        legend.key.height = unit(.07, 'cm'), #change legend key height
+        legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(spplot.primer <-
+ggiNEXT(accum.sp.primer, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  labs(y = "No. species identified",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("black", "darkgreen", "darkorange3")) +
+    scale_fill_manual(values = c("black", "darkgreen", "darkorange3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        legend.key.height = unit(.07, 'cm'), #change legend key height
+        legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(spplot.sub <-
+ggiNEXT(accum.sp.sub, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  labs(y = "",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("black", "steelblue", "indianred3")) +
+    scale_fill_manual(values = c("black", "steelblue", "indianred3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        # legend.key.height = unit(.07, 'cm'), #change legend key height
+        # legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(genplot.primer <-
+ggiNEXT(accum.gen.primer, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  labs(y = "No. genera identified",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("black", "darkgreen", "darkorange3")) +
+    scale_fill_manual(values = c("black", "darkgreen", "darkorange3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        legend.key.height = unit(.07, 'cm'), #change legend key height
+        legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(genplot.sub <-
+ggiNEXT(accum.gen.sub, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  labs(y = "",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("black", "steelblue", "indianred3")) +
+    scale_fill_manual(values = c("black", "steelblue", "indianred3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        # legend.key.height = unit(.07, 'cm'), #change legend key height
+        # legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(famplot.primer <-
+ggiNEXT(accum.fam.primer, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  labs(y = "No. families identified",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("black", "darkgreen", "darkorange3")) +
+    scale_fill_manual(values = c("black", "darkgreen", "darkorange3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        legend.key.height = unit(.07, 'cm'), #change legend key height
+        legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+(famplot.sub <-
+ggiNEXT(accum.fam.sub, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
+  scale_x_continuous(limits = c(0,80)) +
+  labs(y = "",
+       x = "No. samples") +
+    theme_bw() +
+    scale_color_manual(values = c("black", "steelblue", "indianred3")) +
+    scale_fill_manual(values = c("black", "steelblue", "indianred3")) +
+  theme(text = element_text(size = 14),
+        legend.position = c(0.65, 0.1),
+        legend.background = element_rect(fill = "transparent")) +
+  guides(linetype = "none") +
+  theme(legend.key.size = unit(.07, 'cm'), #change legend key size
+        # legend.key.height = unit(.07, 'cm'), #change legend key height
+        # legend.key.width = unit(.07, 'cm'), #change legend key width
+        legend.title = element_text(size=7), #change legend title font size
+        legend.text = element_text(size=7)) #change legend text font size
+)
+
+library(patchwork)
+motuplot.primer + motuplot.sub + plot_spacer() + spplot.primer + spplot.sub + 
+  genplot.primer + genplot.sub + plot_spacer() + famplot.primer + famplot.sub + 
+  plot_layout(ncol = 5, widths = c(0.5, 0.5, 0.15, 0.5, 0.5, 0.5, 0.5, 0.15, 0.5, 0.5))
+ggsave("figures/rev_Fig2new_accumcurves.swarm1_15.png", dpi = 400, width = 11, height = 10)
+
+
+```
+
+# Fig. 2 - old version - construct accumulation curves using iNEXT
 ```{r}
 
 # format data for iNEXT
@@ -557,6 +837,11 @@ accum.data.sp <- list('Understory (COI)' = t(sprayZ_sp_mat),
                  'Bark (16S)' = t(rollC_sp_mat),
                  'Both substrates (16S)' = t(bothC_sp_mat))
 
+accum.data.sp.pooled <- list(
+                 'Both substrates (COI)' = t(bothZ_sp_mat),
+                 'Both substrates (16S)' = t(bothC_sp_mat),
+                 'Both substrates (both primers)' = t(bothCZ_sp_mat))
+
 accum.data.gen <- list('Understory (COI)' = t(sprayZ_gen_mat),
                  'Bark (COI)' = t(rollZ_gen_mat),
                  'Both substrates (COI)' = t(bothZ_gen_mat),
@@ -571,6 +856,9 @@ accum.data.fam <- list('Understory (COI)' = t(sprayZ_fam_mat),
                  'Bark (16S)' = t(rollC_fam_mat),
                  'Both substrates (16S)' = t(bothC_fam_mat))
 
+accum.data.motu.primers <- list('Both substrates (COI)' = t(bothZ_motu_mat),
+                 'Both substrates (16S)' = t(bothC_motu_mat))
+
 # run accumulation curve analyses in iNEXT
 accum.motu <- iNEXT(accum.data.motu, q=0, datatype="incidence_raw", endpoint = 60)
 # accum.motu$iNextEst$coverage_based
@@ -583,6 +871,9 @@ accum.gen <- iNEXT(accum.data.gen, q=0, datatype="incidence_raw", endpoint = 60)
 
 accum.fam <- iNEXT(accum.data.fam, q=0, datatype="incidence_raw", endpoint = 60)
 # accum.fam$iNextEst$coverage_based
+
+accum.sp.pooled <- iNEXT(accum.data.sp.pooled, q=0, datatype="incidence_raw", endpoint = 60)
+# accum.sp.pooled$iNextEst$coverage_based
 
 # create plots for motu, sp, genus, family
 (motuplot <-
@@ -631,7 +922,7 @@ ggiNEXT(accum.fam, type=1, se=TRUE, facet.var="None", color.var="Assemblage", gr
 library(patchwork)
 (motuplot + spplot) / (genplot + famplot)
 # ggsave("figures/rev1_accumcurves.png", width = 12, height = 5, dpi = 400) # 3-panel
-ggsave("figures/rev_Fig1_accumcurves.swarm1.png", width = 12, height = 10, dpi = 400) # 4-panel
+ggsave("figures/rev_Fig1_accumcurves.swarm1_2.png", width = 12, height = 10, dpi = 400) # 4-panel
 
 ```
 # Fig. 2 - Richness, diversity, evenness - by substrate, tree type, primer
@@ -715,11 +1006,6 @@ rarefy_df20 <- rarefy_coleop_df20 %>%
          tree = case_when(tree == "D" ~ "Deciduous",
                           TRUE ~ "Coniferous"))
 
-rarefy_df_wide20 <- data.frame(
-  sample = colnames(rarefy_coleop20),
-  coleop_S = rarefy_coleop20[1,],
-  zeale_S = rarefy_zeale20[1,])
-
 # now create a rarified version of the read matrixes for diversity metrics
 
 coleop_rare_mat_rare20 <- rrarefy(select(coleop_rare_mat20,-sample.sum), 
@@ -785,35 +1071,65 @@ xtextsize = 11
 
 # Richness model
   
-  summary(lm(log(S) ~ tree + method + primer, data = rarefy_df20))
-  library(brms)
+library(brms)
 # (Smod <- brm(log(S) ~ tree + method + primer, data = rarefy_df20, cores = 4))
-# saveRDS(Smod, "output/Smod.rds")
-Smod <- readRDS("output/Smod.rds")
+# saveRDS(Smod, "output/Smod_swarm1.rds")
+(Smod <- readRDS("output/Smod_swarm1.rds"))
+# *** = 99% don't overlap; ** = 95% don't overlap; * = 90% don't overlap
 #                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            3.46      0.11     3.23     3.67 1.00     4660     3023
-# treeDeciduous        0.22      0.12    -0.02     0.45 1.00     4327     3221*
-# methodUnderstory     0.63      0.12     0.39     0.87 1.00     4553     2688***
-# primerCOI           -0.80      0.12    -1.03    -0.56 1.00     5009     2910***
+# Intercept            3.68      0.11     3.46     3.91 1.00     5143     2581
+# treeDeciduous        0.19      0.12    -0.05     0.43 1.00     5671     2868
+# methodUnderstory     0.60      0.13     0.35     0.85 1.00     4614     2836***
+# primerCOI           -0.72      0.12    -0.95    -0.48 1.00     5040     2869***
 
+
+library(tidybayes)
 quantile(spread_draws(Smod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-# 0.02981399 0.41628926 
+# -0.01400608  0.38811674 
 quantile(spread_draws(Smod, b_methodUnderstory)$b_methodUnderstory, c(0.005, 0.995)) 
-# 0.3304864 0.9484978 
+# 0.2655983 0.9279090  
 quantile(spread_draws(Smod, b_primerCOI)$b_primerCOI, c(0.005, 0.995)) 
--1.098370 -0.478974
-Smod.pred <- predict(Smod, 
-                         newdata = expand.grid(tree = c("Coniferous", "Deciduous"),
-                                    primer = c("COI", "16S"),
-                                    method = c("Understory", "Bark")),
-                     probs = c(0.025,0.1,0.9,0.975)) %>%
-  bind_cols(expand.grid(tree = c("Coniferous", "Deciduous"),
-                                    primer = c("COI", "16S"),
-                                    method = c("Understory", "Bark")))
+# -1.0281707 -0.4169117 
 
-stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-1.03, -0.56]***",
-           "\nUnderstory vs. Bark: [0.39, 0.87]***",
-           "\nDeciduous vs. Conifer: [-0.02, 0.45]*\n \n \n ")
+Smod_df <- conditional_effects(Smod, prob = 0.95) %>%
+  do.call(rbind, .) %>%
+  mutate(var = c("Tree type", "Tree type", "Substrate", "Substrate", "Primer set", "Primer set"),
+         effect1__ = case_when(effect1__ == "Coniferous" ~ "Conifer",
+                              TRUE ~ effect1__)) %>%
+  rename(q97.5 = upper__,
+         q2.5 = lower__) %>%
+  bind_cols(select(do.call(rbind, conditional_effects(Smod, prob = 0.80)), q10 = lower__, q90 = upper__))
+
+Smod_ann <- data.frame(var = c("Tree type", "Substrate", "Primer set"),
+                       x = 1.5,
+                       y = 2.25,
+                       label = c("", "***", "***"))
+
+(Splot <- 
+Smod_df %>%
+  ggplot() +
+  geom_point(aes(x=effect1__, y = exp(estimate__)),
+             size = 3) +
+  geom_errorbar(aes(x = effect1__, ymin = exp(q2.5), ymax = exp(q97.5)), width = 0) +
+  geom_errorbar(aes(x = effect1__, ymin = exp(q10), ymax = exp(q90)), width = 0, size = 1) +
+  geom_text(aes(x = x, y = y, label = label), data = Smod_ann, size = 6) +
+  facet_wrap(~var, scales = "free_x") +
+  labs(y = "Rarefied MOTU richness", x = "") +
+  theme_bw()
+)
+
+# Smod.pred <- predict(Smod, 
+#                          newdata = expand.grid(tree = c("Coniferous", "Deciduous"),
+#                                     primer = c("COI", "16S"),
+#                                     method = c("Understory", "Bark")),
+#                      probs = c(0.025,0.1,0.9,0.975)) %>%
+#   bind_cols(expand.grid(tree = c("Coniferous", "Deciduous"),
+#                                     primer = c("COI", "16S"),
+#                                     method = c("Understory", "Bark")))
+
+stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.95, -0.48]***",
+           "\nUnderstory vs. Bark: [0.35, 0.85]***",
+           "\nDeciduous vs. Conifer: [-0.05, 0.43]\n \n \n ")
 S.anntext <- data.frame(primer = c("16S", "COI"),
                         txt = c(stxt, ""))
 
@@ -824,10 +1140,11 @@ rarefy_df20 %>%
   geom_violin(draw_quantiles = .5, aes(x = method, y = S, fill = tree),
               alpha = 0.6) +
     facet_wrap(~primer) +
-  geom_point(size = 3, alpha = .75, aes(x = method, y = S, color = tree),
+  geom_point(size = 1.5, alpha = .75, aes(x = method, y = S, color = tree),
              position = position_dodge(width = .9)) +  
     scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
   scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
+    scale_y_continuous(breaks = c(0,50,100,150,200)) +
   theme_bw() +
   theme(legend.background = element_rect(fill = "transparent"),
         legend.key.size = unit(.35, 'cm'), #change legend key size
@@ -844,7 +1161,7 @@ rarefy_df20 %>%
        fill = "",
        color = "") +
   guides(fill = "none", color = "none") +
-  geom_text(aes(x = 0.5, y = -40, label = txt),
+  geom_text(aes(x = 0.5, y = -65, label = txt),
            hjust = 0,
            data = S.anntext,
            size = annfont,
@@ -854,32 +1171,54 @@ rarefy_df20 %>%
 # Evenness model
 
   library(brms)
-# (Simpmod <- brm(simpson ~ tree + method + primer, data = simpson_df20, cores = 4))
-# saveRDS(Simpmod, "output/Simpmod.rds")
-Simpmod <- readRDS("output/Simpmod.rds")
+ # (Simpmod <- brm(simpson ~ tree + method + primer, data = simpson_df20, cores = 4))
+ # saveRDS(Simpmod, "output/Simpmod_swarm1.rds")
+(Simpmod <- readRDS("output/Simpmod_swarm1.rds"))
 #                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            0.49      0.07     0.36     0.63 1.00     4517     2846
-# treeDeciduous        0.09      0.07    -0.05     0.23 1.00     5137     3015
-# methodUnderstory     0.13      0.08    -0.02     0.28 1.00     4664     3269
-# primerCOI           -0.14      0.07    -0.28     0.01 1.00     4858     2851
+# Intercept            0.50      0.07     0.36     0.63 1.00     4740     2712
+# treeDeciduous        0.09      0.07    -0.05     0.23 1.00     5297     2474
+# methodUnderstory     0.13      0.07    -0.01     0.27 1.00     5554     2983*
+# primerCOI           -0.13      0.07    -0.27     0.02 1.00     5204     2718*
+
 library(tidybayes)
 get_variables(Simpmod)
-quantile(spread_draws(Simpmod, b_treeDeciduous)$b_treeDeciduous, c(0.1, 0.9)) 
 quantile(spread_draws(Simpmod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-# -0.003726669  0.180836298
-# -0.02875764  0.20412008
-quantile(spread_draws(Simpmod, b_methodUnderstory)$b_methodUnderstory, c(0.1, 0.9))
+# -0.02626559  0.20343576 
 quantile(spread_draws(Simpmod, b_methodUnderstory)$b_methodUnderstory, c(0.05, 0.95))
-# 0.0332670 0.2254042 
-# 0.0053226 0.2500290
-quantile(spread_draws(Simpmod, b_primerCOI)$b_primerCOI, c(0.1, 0.9))
+# 0.01157486 0.24795090  
 quantile(spread_draws(Simpmod, b_primerCOI)$b_primerCOI, c(0.05, 0.95))
-# -0.22897201 -0.04530457
-# -0.25429179 -0.02037915
+# -0.248345478 -0.005403437 
+
+Simpmod_df <- conditional_effects(Simpmod, prob = 0.95) %>%
+  do.call(rbind, .) %>%
+  mutate(var = c("Tree type", "Tree type", "Substrate", "Substrate", "Primer set", "Primer set"),
+         effect1__ = case_when(effect1__ == "Coniferous" ~ "Conifer",
+                              TRUE ~ effect1__)) %>%
+  rename(q97.5 = upper__,
+         q2.5 = lower__) %>%
+  bind_cols(select(do.call(rbind, conditional_effects(Simpmod, prob = 0.80)), q10 = lower__, q90 = upper__))
+
+Simpmod_ann <- data.frame(var = c("Tree type", "Substrate", "Primer set"),
+                       x = 1.5,
+                       y = .15,
+                       label = c("", "*", "*"))
+
+(Simpplot <-
+Simpmod_df %>%
+  ggplot() +
+  geom_point(aes(x=effect1__, y = estimate__),
+             size = 3) +
+  geom_errorbar(aes(x = effect1__, ymin = q2.5, ymax = q97.5), width = 0) +
+  geom_errorbar(aes(x = effect1__, ymin = q10, ymax = q90), width = 0, size = 1) +
+  geom_text(aes(x = x, y = y, label = label), data = Simpmod_ann, size = 6) +
+  facet_wrap(~var, scales = "free_x") +
+  labs(y = "Rarefied MOTU evenness (Simpson)", x = "") +
+  theme_bw()
+)
 
 # Evenness boxplots
-stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.28, 0.01]*",
-           "\nUnderstory vs. Bark: [-0.02, 0.28]*",
+stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.27, 0.02]*",
+           "\nUnderstory vs. Bark: [-0.01, 0.27]*",
            "\nDeciduous vs. Conifer: [-0.05, 0.23]\n \n \n ")
 S.anntext <- data.frame(primer = c("16S", "COI"),
                         txt = c(stxt, ""))
@@ -890,10 +1229,10 @@ simpson_df20 %>%
   geom_violin(draw_quantiles = .5, aes(x = method, y = simpson, fill = tree),
               alpha = 0.6) +
     facet_wrap(~primer) +
-  geom_point(size = 3, alpha = .75, aes(x = method, y = simpson, color = tree),
-             position = position_dodge(width = .9)) +  
-  geom_point(size = 2, alpha = 1, aes(x = method, y = simpson, color = tree),
-             position = position_dodge(width = .9)) +  
+  geom_point(size = 1.5, alpha = .75, aes(x = method, y = simpson, color = tree),
+             position = position_dodge(width = .9)) +
+  # geom_point(size = 1.5, alpha = 1, aes(x = method, y = simpson, color = tree),
+  #            position = position_dodge(width = .9)) +  
     scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
   scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
   theme_bw() +
@@ -914,42 +1253,56 @@ simpson_df20 %>%
   )
   
 # Diversity model
- library(brms)
-# (Shanmod <- brm(shannon ~ tree + method + primer, data = shannon_df20, cores = 4))
-# saveRDS(Shanmod, "output/Shanmod.rds")
-Shanmod <- readRDS("output/Shanmod.rds")
+ # library(brms)
+ # (Shanmod <- brm(shannon ~ tree + method + primer, data = shannon_df20, cores = 4))
+# saveRDS(Shanmod, "output/Shanmod_swarm1.rds")
+Shanmod <- readRDS("output/Shanmod_swarm1.rds")
+#                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# Intercept            1.17      0.21     0.76     1.58 1.00     5197     2875
+# treeDeciduous        0.30      0.21    -0.12     0.71 1.00     5530     2778
+# methodUnderstory     0.70      0.23     0.26     1.13 1.00     5515     2788***
+# primerCOI           -0.35      0.22    -0.78     0.08 1.00     5127     2826*
 
 library(tidybayes)
 get_variables(Shanmod)
 quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.025, 0.975)) 
-quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.005, 0.995)) 
-# -0.04759738  0.61697714 
-# -0.1173273  0.6787115
-# -0.2453262 0.8106203 
-quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.1, 0.9))
-quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.05, 0.95))
+# -0.03958887  0.63840591
 quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.995, 0.005))
-# 0.3700738 0.9112348 
-# 0.2870847 0.9986466 
-# 1.21595340 0.05807239 
-quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.1, 0.9))
+# 1.3301088 0.1057974 
 quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.05, 0.95))
-quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.995, 0.005))
-# -0.6440111 -0.1107877 
-# -0.72093485 -0.03081384 
-#  0.1543796 -0.9289227 
+# -0.712829034 -0.001368906 
 
-#                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            1.14      0.20     0.75     1.52 1.00     4381     2944
-# treeDeciduous        0.28      0.20    -0.12     0.68 1.00     4737     3025
-# methodUnderstory     0.64      0.22     0.21     1.06 1.00     4795     2964
-# primerCOI           -0.38      0.21    -0.79     0.04 1.00     5602     2421
+Shanmod_df <- conditional_effects(Shanmod, prob = 0.95) %>%
+  do.call(rbind, .) %>%
+  mutate(var = c("Tree type", "Tree type", "Substrate", "Substrate", "Primer set", "Primer set"),
+         effect1__ = case_when(effect1__ == "Coniferous" ~ "Conifer",
+                              TRUE ~ effect1__)) %>%
+  rename(q97.5 = upper__,
+         q2.5 = lower__) %>%
+  bind_cols(select(do.call(rbind, conditional_effects(Shanmod, prob = 0.80)), q10 = lower__, q90 = upper__))
+
+Shanmod_ann <- data.frame(var = c("Tree type", "Substrate", "Primer set"),
+                       x = 1.5,
+                       y = .1,
+                       label = c("", "***", "*"))
+
+(Shanplot <-
+Shanmod_df %>%
+  ggplot() +
+  geom_point(aes(x=effect1__, y = estimate__),
+             size = 3) +
+  geom_errorbar(aes(x = effect1__, ymin = q2.5, ymax = q97.5), width = 0) +
+  geom_errorbar(aes(x = effect1__, ymin = q10, ymax = q90), width = 0, size = 1) +
+  geom_text(aes(x = x, y = y, label = label), data = Shanmod_ann, size = 6) +
+  facet_wrap(~var, scales = "free_x") +
+  labs(y = "Rarefied MOTU diversity (Shannon)", x = "") +
+  theme_bw()
+)
 
 # Shannon plot
-stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.79, 0.04]*",
-           "\nUnderstory vs. Bark: [0.21, 1.06]***",
-           "\nDeciduous vs. Conifer: [-0.12, 0.68]\n \n \n ")
+stxt <- paste0("COI vs. 16S \u03b2, 95% CI: [-0.78, 0.08]*",
+           "\nUnderstory vs. Bark: [0.26, 1.13]***",
+           "\nDeciduous vs. Conifer: [-0.12, 0.71]\n \n \n ")
 S.anntext <- data.frame(primer = c("16S", "COI"),
                         txt = c(stxt, ""))
 
@@ -959,7 +1312,7 @@ shannon_df20 %>%
   geom_violin(draw_quantiles = .5, aes(x = method, y = shannon, fill = tree),
               alpha = 0.6) +
     facet_wrap(~primer) +
-  geom_point(size = 3, alpha = .75, aes(x = method, y = shannon, color = tree),
+  geom_point(size = 1.5, alpha = .75, aes(x = method, y = shannon, color = tree),
              position = position_dodge(width = .9)) +  
     scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
   scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
@@ -990,9 +1343,18 @@ library(patchwork)
 
 rareShannon.plot / rareS.plot / rareSimpson.plot 
 
-ggsave("figures/rev_Fig2_rarefieddiv_20k15.png", width = 4.5, height = 7, dpi = 400)
+ggsave("figures/rev_Fig2_rarefieddiv_20k_swarm1_4.png", width = 4.5, height = 7, dpi = 400)
+
+
+# plot of marginal effects
+gg = gridExtra::arrangeGrob(Shanplot, Splot, Simpplot)
+
+plot(gg)
+
+ggsave(plot = gg, filename = "figures/rev_Fig3_rarediversity_swarm1_6.png", 
+       height = 9, width = 4, dpi = 400)
 ```
-# Fig. 3A - NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
+# Fig. 4A - NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
 ```{r}
 # format data matrices
 mds.data.sp <- rbind(sprayZ_sp_mat,
@@ -1020,8 +1382,7 @@ apply(mds.data.fam, 1, max)
 mds.data.sp.nb <- mds.data.sp[-which(rownames(mds.data.sp) %in% 
                                      c("sample.9DR_zeale")),]
 
-mds.data.gen.nb <- mds.data.gen[-which(rownames(mds.data.gen) %in% 
-                                     c("sample.9DR_zeale")),]
+mds.data.gen.nb <- mds.data.gen
 
 mds.data.fam.nb <- mds.data.fam
   
@@ -1045,9 +1406,10 @@ env.data <- data.frame(
 # package vegan NMDS
 set.seed(110)
 # arthNMDS.sp = metaMDS(mds.data.sp.nb,
-#                      k=2, distance = 'jaccard', trymax = 10000) 
-# saveRDS(arthNMDS.sp, "output/arthNMDS.sp.rds")
+#                      k=2, distance = 'jaccard', trymax = 10000)
+# saveRDS(arthNMDS.sp, "output/arthNMDS.sp.swarm1.rds")
 arthNMDS.sp <- readRDS("output/arthNMDS.sp.rds")
+arthNMDS.sp # stress: 0.0964
 
 plot1 <- ordiplot(arthNMDS.sp, choices = c(1, 2))
 
@@ -1090,6 +1452,7 @@ str(sites.long1)
       size = 3,
       alpha = 0.85
     ) +
+    annotate("text", x = -1.75, y = -0.67, label = "Stress = 0.096", hjust = 0, size = 3) +
     # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
@@ -1099,12 +1462,9 @@ str(sites.long1)
     ) +
     theme_bw() +
     theme(text = element_text(size = 12)) +
-    ggtitle("Species") #+
-   # guides(shape = "none", color = "none", fill = "none")
+    ggtitle("Species") +
+   guides(shape = "none", color = "none", fill = "none")
 )
-
-# ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
-#        dpi = 600, width = 6, height = 6)
 
 
 # Test for differences among Method and Tree type
@@ -1116,23 +1476,46 @@ perm_arth <- adonis2(mds.data.sp.nb ~ primer + method + tree, data = env.data,
        contr.ordered = "contr.poly")
 
 perm_arth
+#          Df SumOfSqs      R2      F Pr(>F)    
+# primer    1   3.6424 0.11623 9.5804 0.0001 ***
+# method    1   1.3288 0.04240 3.4952 0.0001 ***
+# tree      1   0.5141 0.01641 1.3523 0.0626 .  
+# Residual 68  25.8529 0.82496                  
+# Total    71  31.3382 1.00000             
 
 ### genus level ###
 
 # format covariate data - species level
- # (can use same data as for the species level)
+
+# format covariate data - species level
+env.data.gen <- data.frame(
+  tree = str_sub(gsub(gsub(rownames(mds.data.gen.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                      -2, -2),
+  method = str_sub(gsub(gsub(rownames(mds.data.gen.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                        -1, -1)) %>%
+  mutate(tree = case_when(tree == "C" ~ "Conifer",
+                          tree == "D" ~ "Decid."),
+         method = case_when(method == "R" ~ "Bark",
+                            method == "S" ~ "Leaves"),
+  primer = case_when(grepl(rownames(mds.data.gen.nb), pattern = "zeal") ~ "COI",
+                     TRUE ~ "16S"))
 
 # package vegan NMDS
 set.seed(110)
 # arthNMDS.gen = metaMDS(mds.data.gen.nb,
-#                      k=2, distance = 'jaccard', trymax = 10000) 
-# saveRDS(arthNMDS.gen, "output/arthNMDS.gen.rds")
-arthNMDS.gen <- readRDS("output/arthNMDS.gen.rds")
+#                      k=2, distance = 'jaccard', trymax = 10000)
+# saveRDS(arthNMDS.gen, "output/arthNMDS.gen.swarm1.rds")
+arthNMDS.gen <- readRDS("output/arthNMDS.gen.swarm1.rds")
+arthNMDS.gen # stress = 0.1615
 
 plot1.gen <- ordiplot(arthNMDS.gen, choices = c(1, 2))
 
 sites.long1.gen <-
-  BiodiversityR::sites.long(plot1.gen, env.data = env.data) %>%
+  BiodiversityR::sites.long(plot1.gen, env.data = env.data.gen) %>%
   mutate(axis1 = as.numeric(axis1),
          axis2 = as.numeric(axis2),
          Method = paste0(method, " - ", tree, " (", primer, ")"))
@@ -1170,6 +1553,7 @@ str(sites.long1.gen)
       size = 3,
       alpha = 0.85
     ) +
+    annotate("text", x = -2.3, y = -0.7, label = "Stress = 0.161", hjust = 0, size = 3) +
     # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
@@ -1183,19 +1567,21 @@ str(sites.long1.gen)
     guides(shape = "none", color = "none", fill = "none")
 )
 
-# ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
-#        dpi = 600, width = 6, height = 6)
-
-
 # Test for differences among Method and Tree type (genus level)
 # PERMANOVA
 set.seed(12555)
-perm_arth.gen <- adonis2(mds.data.gen.nb ~ primer + method + tree, data = env.data, 
+perm_arth.gen <- adonis2(mds.data.gen.nb ~ primer + method + tree, data = env.data.gen, 
        permutations = 9999, method = "jaccard",
        strata = NULL, contr.unordered = "contr.sum",
        contr.ordered = "contr.poly")
 
 perm_arth.gen
+#          Df SumOfSqs      R2      F Pr(>F)    
+# primer    1   2.7396 0.08925 7.2833 0.0001 ***
+# method    1   1.5012 0.04890 3.9911 0.0001 ***
+# tree      1   0.5020 0.01635 1.3346 0.0457 *  
+# Residual 69  25.9541 0.84550                  
+# Total    72  30.6970 1.00000   
 
 ### family level ###
 
@@ -1219,9 +1605,10 @@ env.data.fam <- data.frame(
 # package vegan NMDS
 set.seed(110)
 # arthNMDS.fam = metaMDS(mds.data.fam.nb,
-#                      k=2, distance = 'jaccard', trymax = 10000) 
-# saveRDS(arthNMDS.fam, "output/arthNMDS.fam.rds")
+#                      k=2, distance = 'jaccard', trymax = 10000)
+# saveRDS(arthNMDS.fam, "output/arthNMDS.fam.swarm1.rds")
 arthNMDS.fam <- readRDS("output/arthNMDS.fam.rds")
+arthNMDS.fam # stress = 0.202
 
 plot1.fam <- ordiplot(arthNMDS.fam, choices = c(1, 2))
 
@@ -1264,6 +1651,7 @@ str(sites.long1.fam)
       size = 3,
       alpha = 0.85
     ) +
+    annotate("text", x = -1.7, y = -0.7, label = "Stress = 0.202", hjust = 0, size = 3) +
     # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
@@ -1277,10 +1665,6 @@ str(sites.long1.fam)
     guides(shape = "none", color = "none", fill = "none")
 )
 
-# ggsave("figures/rev2_NMDS_by_method_and_tree_type2.jpg",
-#        dpi = 600, width = 6, height = 6)
-
-
 # Test for differences among Method and Tree type
 # PERMANOVA
 set.seed(12555)
@@ -1290,15 +1674,21 @@ perm_arth.fam <- adonis2(mds.data.fam.nb ~ primer + method + tree, data = env.da
        contr.ordered = "contr.poly")
 
 perm_arth.fam
+#          Df SumOfSqs      R2       F Pr(>F)    
+# primer    1   3.2447 0.12936 11.3494 0.0001 ***
+# method    1   1.6348 0.06518  5.7183 0.0001 ***
+# tree      1   0.4766 0.01900  1.6670 0.0197 *  
+# Residual 69  19.7265 0.78646                   
+# Total    72  25.0826 1.00000  
 
 library(patchwork)
 plot.sp / plot.gen / plot.fam #+ 
   # plot_layout(widths = c(3, 3, 3),
               # heights = c(3,3,3))
 
-# ggsave("figures/rev2_nmds_all7.png", height = 9, width = 3, dpi = 400)
+# ggsave("figures/rev2_nmds_all_swarm1_1.png", height = 9, width = 3, dpi = 400)
 ```
-# Fig. 3B - Count up taxa by method and make Venn diagram
+# Fig. 4B - Count up taxa by method and make Venn diagram
 ```{r}
 
 ### family
@@ -1309,32 +1699,39 @@ Z_spray <- art_fam_reads %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(family) %>%
-  distinct() # 76 for zeale/spray (68 each for zeale/spray/conifer & zeale/spray/decid)
+  distinct() 
 
 Z_roll <- art_fam_reads %>%
   select(family, contains(c("CR_zeale", "DR_zeale"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(family) %>%
-  distinct() # 82 for zeale/roll (58 for zeale/roll/conifer; 57 for zeale/roll/decid
+  distinct() 
 
 C_spray <- art_fam_reads %>%
   select(family, contains(c("CS_coleop", "DS_coleop"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(family) %>%
-  distinct() # 107 for coleop/spray (80 for coleop/spray/conifer; 91 for coleop/spray/decid)
+  distinct() 
 
 C_roll <- art_fam_reads %>%
   select(family, contains(c("CR_coleop", "DR_coleop"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(family) %>%
-  distinct() # 88 for coleop/roll (69 for coleop/roll/conifer; 68 for coleop/roll/decid)
+  distinct() 
 
 # get unique families within each method (change names to get different combos)
-# zeale has 110 families (50 of which are not found in coleop)
-# coleop has 122 families (62 of which are not found in zeale)
+# zeale has 115 families (52 of which are not found in coleop)
+# coleop has 127 families (64 of which are not found in zeale)
+(Z_uni <- Z_spray %>%
+    bind_rows(Z_roll) %>%
+    distinct() %>%
+  filter(family %notin% unique(c(
+                           C_spray$family,
+                           C_roll$family)))) 
+
 (C_uni <- C_spray %>%
     bind_rows(C_roll) %>%
     distinct() %>%
@@ -1347,29 +1744,37 @@ C_roll <- art_fam_reads %>%
 # devtools::install_github("yanlinlin82/ggvenn")
 
 venn_methods_fam <- list(
-  'Understory\n(COI)' = Z_spray$family,
-  'Understory (16S)' = C_spray$family,
+  'US\n(COI)' = Z_spray$family,
+  'US (16S)' = C_spray$family,
   'Bark (COI)' = Z_roll$family,
   'Bark\n(16S)' = C_roll$family
 )
 
-library(ggvenn)
-(vennfam <- ggvenn(
-  venn_methods_fam, 
-  fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
-  # blue, yellow, gray, red
-  stroke_size = 0.6, set_name_size = 3,
-  text_size = 2.25
-  ) + scale_x_continuous(expand = expansion(mult = .2)) #+
-  #ggtitle("Family")
+library(ggVennDiagram)
+(vennfam <- ggVennDiagram(venn_methods_fam, label_alpha = 0, edge_lty = 1,
+              label_color = "black", edge_size = 0.5, set_size = 3, label_size = 3) +
+  scale_fill_gradient(low="pink",high = "firebrick") +
+  scale_color_manual(values = c(rep("darkgray", 4))) +
+  labs(fill = "")
 )
 
-# ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
+# library(ggvenn)
+# (vennfam <- ggvenn(
+#   venn_methods_fam, 
+#   fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
+#   # blue, yellow, gray, red
+#   stroke_size = 0.6, set_name_size = 3,
+#   text_size = 2.25
+#   ) + scale_x_continuous(expand = expansion(mult = .2)) #+
+#   #ggtitle("Family")
+# )
 
 # pairwise overlap (manually counted from Venn diagram)
-# leaves-bark: 96 overlapping of 173 total (55% overlap)
-# COI-16S: 60 overlapping of 173 total (35% overlap)
-# conif-decid: 112 overlapping of 173 total (65% overlap)
+# leaves-bark: 96 overlapping of 179 total (54% overlap)
+unique(c(Z_spray$family, C_spray$family))[unique(c(Z_spray$family, C_spray$family)) %in% unique(c(Z_roll$family, C_roll$family))]
+# COI-16S: 63 overlapping of 179 total (35% overlap)
+unique(c(Z_spray$family, Z_roll$family))[unique(c(Z_spray$family, Z_roll$family)) %in% unique(c(C_spray$family, C_roll$family))]
+# conif-decid: xx overlapping of 179 total (xx% overlap)
 
 ### genus
 
@@ -1403,8 +1808,8 @@ C_roll.gen <- art_gen_reads %>%
   distinct() # 81 for coleop/roll
 
 # get unique genera within each method (change names to get different combos)
-# zeale has 191 genera (156 of which are not found in coleop)
-# coleop has 152 genera (117 of which are not found in zeale)
+# zeale has 225 genera (177 of which are not found in coleop)
+# coleop has 177 genera (129 of which are not found in zeale)
 (C_uni.gen <- C_spray.gen %>%
     bind_rows(C_roll.gen) %>%
     distinct() %>%
@@ -1424,120 +1829,139 @@ C_roll.gen <- art_gen_reads %>%
 # devtools::install_github("yanlinlin82/ggvenn")
 
 venn_methods_gen <- list(
-  'Understory\n(COI)' = Z_spray.gen$genus,
-  'Understory (16S)' = C_spray.gen$genus,
+  'US\n(COI)' = Z_spray.gen$genus,
+  'US (16S)' = C_spray.gen$genus,
   'Bark (COI)' = Z_roll.gen$genus,
   'Bark\n(16S)' = C_roll.gen$genus
 )
 
-library(ggvenn)
-(venngen <- ggvenn(
-  venn_methods_gen, 
-  fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
-  # blue, yellow, gray, red
-  stroke_size = 0.6, set_name_size = 3,
-  text_size = 2.25
-  ) + scale_x_continuous(expand = expansion(mult = .2))#+
-  #ggtitle("Genus")
+library(ggVennDiagram)
+(venngen <- ggVennDiagram(venn_methods_gen, label_alpha = 0, edge_lty = 1,
+              label_color = "black", edge_size = 0.5, set_size = 3, label_size = 3) +
+  scale_fill_gradient(low="pink",high = "firebrick") +
+  scale_color_manual(values = c(rep("darkgray", 4))) +
+  labs(fill = "")
 )
 
-# ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
+# library(ggvenn)
+# (venngen <- ggvenn(
+#   venn_methods_gen, 
+#   fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
+#   # blue, yellow, gray, red
+#   stroke_size = 0.6, set_name_size = 3,
+#   text_size = 2.25
+#   ) + scale_x_continuous(expand = expansion(mult = .2))#+
+#   #ggtitle("Genus")
+# )
 
 # pairwise overlap (manually counted from Venn diagram)
-# leaves-bark: 103 overlapping of 307 total (34% overlap)
-# COI-16S: 35 overlapping of 307 total (11% overlap)
+# leaves-bark: 111 overlapping of 354 total (31% overlap)
+unique(c(Z_spray.gen$genus, C_spray.gen$genus))[unique(c(Z_spray.gen$genus, C_spray.gen$genus)) %in% unique(c(Z_roll.gen$genus, C_roll.gen$genus))]
+# COI-16S: 48 overlapping of 354 total (14% overlap)
+unique(c(Z_spray.gen$genus, Z_roll.gen$genus))[unique(c(Z_spray.gen$genus, Z_roll.gen$genus)) %in% unique(c(C_roll.gen$genus, C_spray.gen$genus))]
 # conif-decid: XX overlapping of XX total (xx% overlap)
 
 ### species
 
 # subdivide 'art' into columns by primer / substrate / tree type for counting
 Z_spray.sp <- art_sp_reads %>%
-  select(sci, contains(c("CS_zeale", "DS_zeale"))) %>%
+  select(species, contains(c("CS_zeale", "DS_zeale"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
-  select(sci) %>%
-  distinct() # 119 for zeale/spray
+  select(species) %>%
+  distinct() # 143 for zeale/spray
 
 Z_roll.sp <- art_sp_reads %>%
-  select(sci, contains(c("CR_zeale", "DR_zeale"))) %>%
+  select(species, contains(c("CR_zeale", "DR_zeale"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
-  select(sci) %>%
-  distinct() # 73 for zeale/roll
+  select(species) %>%
+  distinct() # 81 for zeale/roll
 
 C_spray.sp <- art_sp_reads %>%
-  select(sci, contains(c("CS_coleop", "DS_coleop"))) %>%
+  select(species, contains(c("CS_coleop", "DS_coleop"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
-  select(sci) %>%
-  distinct() # 80 for coleop/spray
+  select(species) %>%
+  distinct() # 92 for coleop/spray
 
 C_roll.sp <- art_sp_reads %>%
-  select(sci, contains(c("CR_coleop", "DR_coleop"))) %>%
+  select(species, contains(c("CR_coleop", "DR_coleop"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
-  select(sci) %>%
-  distinct() # 45 for coleop/roll
+  select(species) %>%
+  distinct() # 47 for coleop/roll
 
 # get unique genera within each method (change names to get different combos)
-# zeale has 157 sp (146 of which are not found in coleop)
-# coleop has 92 sp (81 of which are not found in zeale)
+# zeale has 186 sp (166 of which are not found in coleop)
+# coleop has 104 sp (84 of which are not found in zeale)
+# so they only share 20 species in common, zeale has 166 unique sp, coleop has 85 unique sp
 (C_uni.sp <- C_spray.sp %>%
     bind_rows(C_roll.sp) %>%
     distinct() %>%
-  filter(sci %notin% unique(c(
-                           Z_spray.sp$sci, 
-                           Z_roll.sp$sci)))) 
+  filter(species %notin% unique(c(
+                           Z_spray.sp$species, 
+                           Z_roll.sp$species)))) 
 
 (Z_uni.sp <- Z_spray.sp %>%
     bind_rows(Z_roll.sp) %>%
     distinct() %>%
-  filter(sci %notin% unique(c(
-                           C_spray.sp$sci, 
-                           C_roll.sp$sci)))) 
+  filter(species %notin% unique(c(
+                           C_spray.sp$species, 
+                           C_roll.sp$species)))) 
 
 # Venn diagram of the 8 primer/substrates
 # code from: https://www.datanovia.com/en/blog/venn-diagram-with-r-or-rstudio-a-million-ways/
 # devtools::install_github("yanlinlin82/ggvenn")
 
 venn_methods_sp <- list(
-  'Understory\n(COI)' = Z_spray.sp$sci,
-  'Undertstory (16S)' = C_spray.sp$sci,
-  'Bark (COI)' = Z_roll.sp$sci,
-  'Bark\n(16S)' = C_roll.sp$sci
+  'US\n(COI)' = Z_spray.sp$species,
+  'US (16S)' = C_spray.sp$species,
+  'Bark (COI)' = Z_roll.sp$species,
+  'Bark\n(16S)' = C_roll.sp$species
 )
 
-library(ggvenn)
-(vennsp <- ggvenn(
-  venn_methods_sp, 
-  fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
-  # blue, yellow, gray, red
-  stroke_size = 0.6, set_name_size = 3,
-  text_size = 2.25
-  ) + scale_x_continuous(expand = expansion(mult = .2))#+
-  #ggtitle("Species")
+library(ggVennDiagram)
+(vennsp <- ggVennDiagram(venn_methods_sp, label_alpha = 0, edge_lty = 1,
+              label_color = "black", edge_size = 0.5, set_size = 3, label_size = 3) +
+  scale_fill_gradient(low="pink",high = "firebrick") +
+  scale_color_manual(values = c(rep("darkgray", 4))) +
+  labs(fill = "")
 )
 
-# ggsave("figures/venn3.jpg", height = 6, width = 6, dpi = 400)
+# library(ggvenn)
+# (vennsp <- ggvenn(
+#   venn_methods_sp, 
+#   fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
+#   # blue, yellow, gray, red
+#   stroke_size = 0.6, set_name_size = 3,
+#   text_size = 2.25
+#   ) + scale_x_continuous(expand = expansion(mult = .2))#+
+#   #ggtitle("Species")
+# )
 
 # pairwise overlap (manually counted from Venn diagram)
-# leaves-bark: 66 overlapping of 237 total (28% overlap)
-# COI-16S: 11 overlapping of 237 total (5% overlap)
+# leaves-bark: 67 overlapping of 271 total (25% overlap)
+unique(c(Z_spray.sp$species, C_spray.sp$species))[unique(c(Z_spray.sp$species, C_spray.sp$species)) %in% unique(c(Z_roll.sp$species, C_roll.sp$species))]
+# COI-16S: 20 overlapping of 271 total (7% overlap)
+unique(c(Z_spray.sp$species, Z_roll.sp$species))[unique(c(Z_spray.sp$species, Z_roll.sp$species)) %in% unique(c(C_spray.sp$species, C_roll.sp$species))]
 # conif-decid: XX overlapping of XX total (xx% overlap)
 
 library(patchwork)
 
-( plot.sp + vennsp ) / ( plot.gen + venngen ) / (plot.fam + vennfam )
+plot.sp + plot_spacer() + vennsp + plot.gen + plot_spacer() + venngen + plot.fam + plot_spacer() + vennfam + 
+  plot_layout(ncol = 3, widths = c(1,.1,1,1,.1,1,1,.1,1))
 
-gg = gridExtra::arrangeGrob(plot.sp, vennsp, plot.gen, 
-                            venngen, plot.fam, vennfam)
-
-plot(gg)
-
-# ggsave("figures/rev3_venn_all10.png", height = 10, width = 6, dpi = 400)
-
-ggsave(plot = gg, filename = "figures/rev_Fig3_nmdsvenn_all17.png", 
+ggsave(filename = "figures/rev_Fig4_nmdsvenn_all_swarm1_10.png",
        height = 10, width = 7, dpi = 400)
+
+# gg = gridExtra::arrangeGrob(plot.sp, vennsp, plot.gen, 
+#                             venngen, plot.fam, vennfam)
+# 
+# plot(gg)
+
+# ggsave(plot = gg, filename = "figures/rev_Fig4_nmdsvenn_all_swarm1_3.png", 
+#        height = 10, width = 7, dpi = 400)
 
 # rm(art_spray, art_water, art_roll, art_soil,
 #    soil_unique, spray_unique, roll_unique, water_unique,
@@ -1555,9 +1979,9 @@ Number of motus ID'd to each taxonomic level
 
 ordersC <- art_full %>%
   filter(!is.na(order), primer == "coleop", sample.sum > 0) %>%
-  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+  mutate(idsp = case_when(!is.na(species) & sample.sum > 0 ~ 1,
                           TRUE ~ 0),
-         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+         idgen = case_when(!is.na(genus) & is.na(species) & sample.sum > 0 ~ 1,
                            TRUE ~ 0),
          idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
                            TRUE ~ 0),
@@ -1579,9 +2003,9 @@ ordersC <- art_full %>%
 
 ordersZ <- art_full %>%
   filter(!is.na(order), primer == "zeale", sample.sum > 0) %>%
-  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+  mutate(idsp = case_when(!is.na(species) & sample.sum > 0 ~ 1,
                           TRUE ~ 0),
-         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+         idgen = case_when(!is.na(genus) & is.na(species) & sample.sum > 0 ~ 1,
                            TRUE ~ 0),
          idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
                            TRUE ~ 0),
@@ -1710,7 +2134,7 @@ orders_df %>%
 library(patchwork)
 hdiv_plot / ldiv_plot
 
-ggsave("figures/rev_Fig4_ordermotus12.png", height = 9, width = 7.5, dpi = 400)
+ggsave("figures/rev_Fig1_ordermotus_swarm1_1.png", height = 9, width = 7.5, dpi = 400)
 
 ```
 # Fig. 4 (alternate) - this time including leaves vs. bark
@@ -1727,13 +2151,13 @@ ggsave("figures/rev_Fig4_ordermotus12.png", height = 9, width = 7.5, dpi = 400)
 # format data for spray samples (coleop)
 ordersCspray <- art_full %>%
   filter(!is.na(order), primer == "coleop") %>%
-  select(class, order, family, genus, sci, contains(c("CS", "DS"))) %>%
+  select(class, order, family, genus, species, contains(c("CS", "DS"))) %>%
   rowwise() %>% 
   mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
   ungroup() %>%
-  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+  mutate(idsp = case_when(!is.na(species) & sample.sum > 0 ~ 1,
                           TRUE ~ 0),
-         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+         idgen = case_when(!is.na(genus) & is.na(species) & sample.sum > 0 ~ 1,
                            TRUE ~ 0),
          idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
                            TRUE ~ 0),
@@ -1756,13 +2180,13 @@ ordersCspray <- art_full %>%
 # format data for roller samples (coleop)
 ordersCroll <- art_full %>%
   filter(!is.na(order), primer == "coleop") %>%
-  select(class, order, family, genus, sci, contains(c("CR", "DR"))) %>%
+  select(class, order, family, genus, species, contains(c("CR", "DR"))) %>%
   rowwise() %>% 
   mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
   ungroup() %>%
-  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+  mutate(idsp = case_when(!is.na(species) & sample.sum > 0 ~ 1,
                           TRUE ~ 0),
-         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+         idgen = case_when(!is.na(genus) & is.na(species) & sample.sum > 0 ~ 1,
                            TRUE ~ 0),
          idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
                            TRUE ~ 0),
@@ -1787,13 +2211,13 @@ ordersCroll <- art_full %>%
 # format data for spray samples (zeale)
 ordersZspray <- art_full %>%
   filter(!is.na(order), primer == "zeale") %>%
-  select(class, order, family, genus, sci, contains(c("CS", "DS"))) %>%
+  select(class, order, family, genus, species, contains(c("CS", "DS"))) %>%
   rowwise() %>% 
   mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
   ungroup() %>%
-  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+  mutate(idsp = case_when(!is.na(species) & sample.sum > 0 ~ 1,
                           TRUE ~ 0),
-         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+         idgen = case_when(!is.na(genus) & is.na(species) & sample.sum > 0 ~ 1,
                            TRUE ~ 0),
          idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
                            TRUE ~ 0),
@@ -1816,13 +2240,13 @@ ordersZspray <- art_full %>%
 # format data for roll samples (zeale)
 ordersZroll <- art_full %>%
   filter(!is.na(order), primer == "zeale") %>%
-  select(class, order, family, genus, sci, contains(c("CR", "DR"))) %>%
+  select(class, order, family, genus, species, contains(c("CR", "DR"))) %>%
   rowwise() %>% 
   mutate(sample.sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
   ungroup() %>%
-  mutate(idsp = case_when(!is.na(genus) & (genus != sci) & sample.sum > 0 ~ 1,
+  mutate(idsp = case_when(!is.na(species) & sample.sum > 0 ~ 1,
                           TRUE ~ 0),
-         idgen = case_when(!is.na(genus) & (genus == sci) & sample.sum > 0 ~ 1,
+         idgen = case_when(!is.na(genus) & is.na(species) & sample.sum > 0 ~ 1,
                            TRUE ~ 0),
          idfam = case_when((!is.na(family) & is.na(genus) & sample.sum > 0) ~ 1,
                            TRUE ~ 0),
@@ -1844,7 +2268,7 @@ ordersZroll <- art_full %>%
 
 # combine MOTU count datasets into one for plotting
 
-orders_df <- ordersCspray %>%
+orders_df2 <- ordersCspray %>%
   bind_rows(ordersZspray) %>%
   bind_rows(ordersCroll) %>%
   bind_rows(ordersZroll) %>%
@@ -1903,7 +2327,7 @@ library(forcats)
 # library(wesanderson)
 (
 ldiv_plot <- 
-orders_df %>%
+orders_df2 %>%
     mutate(group = case_when(summotu >= 50 ~ "More",
                              TRUE ~ "Less")) %>%
     filter(group == "Less") %>%
@@ -1936,7 +2360,7 @@ orders_df %>%
 # make plot for more-diverse taxa
 (
 hdiv_plot <- 
-orders_df %>%
+orders_df2 %>%
     mutate(group = case_when(summotu >= 50 ~ "More",
                              TRUE ~ "Less")) %>%
     filter(group == "More") %>%
@@ -1961,8 +2385,70 @@ orders_df %>%
 library(patchwork)
 hdiv_plot / ldiv_plot
 
-ggsave("figures/rev_Fig4alt_ordermotussub4.png", 
-       height = 9, width = 7.5, dpi = 400)
+# ggsave("figures/rev_Fig1alt_ordermotussub_swarm1_1.png",
+#        height = 9, width = 7.5, dpi = 400)
+
+```
+# Table 1. composition of MOTUs
+```{r}
+# note: ordersCspray and similar dfs were created in the preceding chunk
+orders_df3 <- ordersCspray %>%
+  bind_rows(ordersZspray) %>%
+  bind_rows(ordersCroll) %>%
+  bind_rows(ordersZroll) %>%
+  mutate(engname = case_when(order == "Mesostigmata" ~ "Mites",
+                          order == "Sarcoptiformes" ~ "Mites",
+                          order == "Trombidiformes" ~ "Mites",
+                          class == "Collembola" ~ "Springtails",
+                          class == "Chilopoda" ~ "Centipedes",
+                          order == "Araneae" ~ "Spiders",
+                          order == "Opiliones" ~ "Harvestmen",
+                          order == "Blattodea" ~ "Cockroaches",
+                          order == "Coleoptera" ~ "Beetles",
+                          order == "Dermaptera" ~ "Earwigs",
+                          order == "Diptera" ~ "Flies",
+                          order == "Ephemeroptera" ~ "Mayflies",
+                          order == "Hemiptera" ~ "True bugs",
+                          order == "Hymenoptera" ~ "Bees, wasps, & ants",
+                          order == "Lepidoptera" ~ "Butterflies & moths",
+                          order == "Mantodea" ~ "Mantids",
+                          order == "Megaloptera" ~ "Dobsonflies",
+                          order == "Cyclopoida" ~ "Copepods",
+                          order == "Neuroptera" ~ "Lacewings",
+                          order == "Odonata" ~ "Dragonflies & damselflies",
+                          order == "Orthoptera" ~ "Crickets & grasshoppers",
+                          order == "Phasmatodea" ~ "Walking sticks",
+                          order == "Phthiraptera" ~ "Thrips",
+                          order == "Psocoptera" ~ "Bark lice",
+                          order == "Siphonaptera" ~ "Fleas",
+                          order == "Trichoptera" ~ "Caddisflies"
+                          )) %>%
+  group_by(class, primer, engname) %>%
+  summarize(Order = sum(ord, na.rm = T),
+            Family = sum(fam, na.rm = T),
+            Genus = sum(gen, na.rm = T),
+            Species = sum(sp, na.rm = T),
+            .groups = "drop") %>%
+  rowwise() %>%
+  mutate(motus = sum(c_across(Order:Species), na.rm = T)) %>%
+  select(-Order, -Family, -Genus, -Species) %>%
+  pivot_wider(id_cols = c(class, engname), names_from = primer, values_from = motus) %>%
+  select(class, engname, ends_with("Bark (COI)"), ends_with("Understory (COI)"),
+         ends_with("Bark (16S)"), ends_with("Understory (16S)")) %>%
+  rowwise() %>%
+  mutate(csum = sum(c_across(3:6))) %>%
+  ungroup() %>%
+  arrange(class, desc(csum)) %>%
+  select(-csum)
+
+library(knitr)
+library(kableExtra)
+library(magrittr)
+
+kable(orders_df3, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  cat(., file = "figures/table1_motu_tally.html")
+
 
 ```
 # Fig 5 (part 1) - multinomial models for feeding guild data
@@ -2010,7 +2496,11 @@ feed_freq_sumZ <- feed_freq_sumZ1 %>%
   select(-sample)
 
 feed_freq_sum <- feed_freq_sumC %>%
-  bind_rows(feed_freq_sumZ)
+  bind_rows(feed_freq_sumZ) %>%
+  rowwise() %>%
+  mutate(scav = sum(c_across(c(scav, myce)))) %>%
+  ungroup() %>%
+  select(-myce)
 
 rm(feed_freq, feed_freq_sum1, feed_freq_sumC1, feed_freq_sumZ1, feed_freq_sumC, feed_freq_sumZ)
 
@@ -2018,54 +2508,69 @@ library(brms)
 
 dat <- feed_freq_sum
 dat$a1 <- 1
-dat$size <- with(dat, mult + myce + para + phyt + pred + scav)
-dat$y <- with(dat, cbind(mult, myce, para, phyt, pred, scav))
+dat$size <- with(dat, mult + para + phyt + pred + scav)
+dat$y <- with(dat, cbind(mult, para, phyt, pred, scav))
 
-# model with both method and tree type
-set.seed(102)
-fit.prim.method.tree <- brm(bf(y | trials(size) ~ primer + method + tree), 
-            data = dat, family = multinomial(refcat = "mult"),
-            save_pars = save_pars(all = TRUE), cores = 4)
-
-# model with only method
+# # model with primer, method, and tree type
 # set.seed(102)
-# fit.method <- brm(bf(y | trials(size) ~ method), 
+# fit.prim.method.tree <- brm(bf(y | trials(size) ~ primer + method + tree),
 #             data = dat, family = multinomial(refcat = "mult"),
-#             save_pars = save_pars(all = TRUE))
-
-# model with only tree type
-# set.seed(102)
-# fit.tree <- brm(bf(y | trials(size) ~ tree), 
-#             data = dat, family = multinomial(refcat = "mult"),
-#             save_pars = save_pars(all = TRUE))
+#             save_pars = save_pars(all = TRUE), cores = 4, 
+#             warmup = 2000, iter = 4000)
 # 
+# # model with only primer and method
+# set.seed(102)
+# fit.prim.method <- brm(bf(y | trials(size) ~ primer + method),
+#             data = dat, family = multinomial(refcat = "mult"),
+#             save_pars = save_pars(all = TRUE), cores = 4, 
+#             warmup = 2000, iter = 4000)
+# 
+# # model with only primer and tree
+# set.seed(102)
+# fit.prim.tree <- brm(bf(y | trials(size) ~ primer + tree),
+#             data = dat, family = multinomial(refcat = "mult"),
+#             save_pars = save_pars(all = TRUE), cores = 4, 
+#             warmup = 2000, iter = 4000)
+# 
+# # model with only primer
+# set.seed(102)
+# fit.prim <- brm(bf(y | trials(size) ~ primer),
+#             data = dat, family = multinomial(refcat = "mult"),
+#             save_pars = save_pars(all = TRUE), cores = 4,
+#             warmup = 2000, iter = 4000)
+
 # # adding LOOIC criterion to 3 models
-# fit.method.tree <- add_criterion(fit.method.tree, "loo", 
+# fit.prim.method.tree <- add_criterion(fit.prim.method.tree, "loo",
 #                                  moment_match = T,
 #                           reloo = TRUE)
-# fit.method <- add_criterion(fit.method, "loo", 
+# fit.prim.method <- add_criterion(fit.prim.method, "loo",
 #                                  moment_match = T,
 #                           reloo = TRUE)
-# fit.tree <- add_criterion(fit.tree, "loo", 
+# fit.prim.tree <- add_criterion(fit.prim.tree, "loo",
+#                                  moment_match = T,
+#                           reloo = TRUE)
+# fit.prim <- add_criterion(fit.prim, "loo",
 #                                  moment_match = T,
 #                           reloo = TRUE)
 
 # save model output so we don't have to refit each time
-saveRDS(fit.prim.method.tree, "output/feed_multinomial_prim.method.tree_nb.rds")
-# saveRDS(fit.method, "output/feed_multinomial_method_nb.rds")
-# saveRDS(fit.tree, "output/feed_multinomial_tree_nb.rds")
+# saveRDS(fit.prim.method.tree, "output/feed_multinomial_prim.method.tree_nb_swarm1.rds")
+# saveRDS(fit.prim.method, "output/feed_multinomial_prim.method_nb_swarm1.rds")
+# saveRDS(fit.prim.tree, "output/feed_multinomial_prim.tree_nb_swarm1.rds")
+# saveRDS(fit.prim, "output/feed_multinomial_prim_nb_swarm1.rds")
 
 # load the models so we don't have to refit them each time
-fit.prim.method.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb.rds")
-# fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
-# fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
+fit.prim.method.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb_swarm1.rds")
+fit.prim.method <- readRDS("output/feed_multinomial_prim.method.tree_nb_swarm1.rds")
+fit.prim.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb_swarm1.rds")
+fit.prim <- readRDS("output/feed_multinomial_prim.method.tree_nb_swarm1.rds")
 
 # evaluating models based on LOOIC
-# brms::loo_compare(fit.method.tree, fit.method, fit.tree, 
-#             criterion = "loo") %>% 
-#   print(simplify = F)
+brms::loo_compare(fit.prim.method.tree, fit.prim.method, fit.prim.tree, fit.prim,
+            criterion = "loo") %>%
+  print(simplify = F)
 
-# method is lowest, delta looic = 2.6
+# method is lowest, nearest model is delta elpd = -4 (se = 2.4)
 ```
 # Fig 5 (part 2) - multinomial models for lifemode data
 https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
@@ -2128,7 +2633,7 @@ dat <- life_freq_sum
 dat$size <- with(dat, aqlar + fullter + someaq) # removed fullaq
 dat$y <- with(dat, cbind(aqlar, fullter, someaq)) # removed fullaq
 
-# model with both method and tree type
+# model with primer, method, and tree type
 set.seed(102)
 life.prim.method.tree <- brms::brm(bf(y | trials(size) ~ primer + method + tree), 
             data = dat, family = multinomial(refcat = "aqlar"),
@@ -2136,49 +2641,62 @@ life.prim.method.tree <- brms::brm(bf(y | trials(size) ~ primer + method + tree)
                           iter = 4000, warmup = 2000,
                           chains = 4, cores = 4)
 
-# model with only method
-# set.seed(102)
-# life.method <- brms::brm(bf(y | trials(size) ~ method), 
-#             data = dat, family = multinomial(refcat = "aqlar"),
-#             save_pars = save_pars(all = TRUE), 
-#                           iter = 4000, warmup = 2000,
-#                           chains = 3, cores = 3)
+# model with primer, method
+set.seed(102)
+life.prim.method <- brms::brm(bf(y | trials(size) ~ primer + method), 
+            data = dat, family = multinomial(refcat = "aqlar"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
 
-# model with only tree type
-# set.seed(102)
-# life.tree <- brms::brm(bf(y | trials(size) ~ tree), 
-#             data = dat, family = multinomial(refcat = "aqlar"),
-#             save_pars = save_pars(all = TRUE), 
-#                           iter = 4000, warmup = 2000,
-#                           chains = 3, cores = 3)
+# model with primer, tree type
+set.seed(102)
+life.prim.tree <- brms::brm(bf(y | trials(size) ~ primer + tree), 
+            data = dat, family = multinomial(refcat = "aqlar"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
+
+# model with just primer
+set.seed(102)
+life.prim <- brms::brm(bf(y | trials(size) ~ primer), 
+            data = dat, family = multinomial(refcat = "aqlar"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
 
 # adding LOOIC criterion to 3 models
-# life.method.tree <- brms::add_criterion(life.method.tree, "loo", 
-#                                  moment_match = T,
-#                           reloo = TRUE)
-# life.method <- brms::add_criterion(life.method, "loo", 
-#                                  moment_match = T,
-#                           reloo = TRUE)
-# life.tree <- brms::add_criterion(life.tree, "loo", 
-#                                  moment_match = T,
-#                           reloo = TRUE)
+life.prim.method.tree <- brms::add_criterion(life.prim.method.tree, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
+life.prim.method <- brms::add_criterion(life.prim.method, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
+life.prim.tree <- brms::add_criterion(life.prim.tree, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
+life.prim <- brms::add_criterion(life.prim, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
 
 # save model output so we don't have to refit each time
-saveRDS(life.prim.method.tree, "output/life_multinomial_prim.method.tree_nb.rds")
-# saveRDS(life.method, "output/life_multinomial_method_nb.rds")
-# saveRDS(life.tree, "output/life_multinomial_tree_nb.rds")
+saveRDS(life.prim.method.tree, "output/life_multinomial_prim.method.tree_nb_swarm1.rds")
+saveRDS(life.prim.method, "output/life_multinomial_prim.method_nb_swarm1.rds")
+saveRDS(life.prim.tree, "output/life_multinomial_prim.tree_nb_swarm1.rds")
+saveRDS(life.prim, "output/life_multinomial_prim_nb_swarm1.rds")
 
 # load the models so we don't have to refit them each time
-life.prim.method.tree <- readRDS("output/life_multinomial_method.tree_nb.rds")
-# life.method <- readRDS("output/life_multinomial_method_nb.rds")
-# life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
+life.prim.method.tree <- readRDS("output/life_multinomial_prim.method.tree_nb_swarm1.rds")
+life.prim.method <- readRDS("output/life_multinomial_prim.method_nb_swarm1.rds")
+life.prim.tree <- readRDS("output/life_multinomial_prim.tree_nb_swarm1.rds")
+life.prim <- readRDS("output/life_multinomial_prim_nb_swarm1.rds")
 
 # evaluating models based on LOOIC
-# brms::loo_compare(life.method.tree, life.method, life.tree, 
-#             criterion = "loo") %>% 
-#   print(simplify = F)
+brms::loo_compare(life.prim.method.tree, life.prim.method, life.prim.tree, life.prim,
+            criterion = "loo") %>%
+  print(simplify = F)
 
-# method is lowest, delta looic = 3.2
+# method is lowest, delta elpd to next lowest model = -1 (se 2.4)
 ```
 # Fig 5 (part 3) - multinomial models for size data
 https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
@@ -2239,7 +2757,7 @@ dat <- size_freq_sum
 dat$size <- with(dat, vsmal + vbig + big + smal)
 dat$y <- with(dat, cbind(vsmal, vbig, big, smal))
 
-# model with both method and tree type
+# model with primer, method and tree type
 set.seed(102)
 size.prim.method.tree <- brms::brm(bf(y | trials(size) ~ primer + method + tree), 
             data = dat, family = multinomial(refcat = "vsmal"),
@@ -2247,49 +2765,62 @@ size.prim.method.tree <- brms::brm(bf(y | trials(size) ~ primer + method + tree)
                           iter = 4000, warmup = 2000,
                           chains = 4, cores = 4)
 
-# model with only method
-# set.seed(102)
-# size.method <- brms::brm(bf(y | trials(size) ~ method), 
-#             data = dat, family = multinomial(refcat = "vsmal"),
-#             save_pars = save_pars(all = TRUE), 
-#                           iter = 4000, warmup = 2000,
-#                           chains = 3, cores = 3)
+# model with primer, method
+set.seed(102)
+size.prim.method <- brms::brm(bf(y | trials(size) ~ primer + method), 
+            data = dat, family = multinomial(refcat = "vsmal"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
 
-# model with only tree type
-# set.seed(102)
-# size.tree <- brms::brm(bf(y | trials(size) ~ tree), 
-#             data = dat, family = multinomial(refcat = "vsmal"),
-#             save_pars = save_pars(all = TRUE), 
-#                           iter = 4000, warmup = 2000,
-#                           chains = 3, cores = 3)
+# model with primer, tree type
+set.seed(102)
+size.prim.tree <- brms::brm(bf(y | trials(size) ~ primer + tree), 
+            data = dat, family = multinomial(refcat = "vsmal"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
+
+# model with just primer
+set.seed(102)
+size.prim <- brms::brm(bf(y | trials(size) ~ primer), 
+            data = dat, family = multinomial(refcat = "vsmal"),
+            save_pars = save_pars(all = TRUE), 
+                          iter = 4000, warmup = 2000,
+                          chains = 4, cores = 4)
 
 # adding LOOIC criterion to 3 models
-# size.method.tree <- brms::add_criterion(size.method.tree, "loo", 
-#                                  moment_match = T,
-#                           reloo = TRUE)
-# size.method <- brms::add_criterion(size.method, "loo", 
-#                                  moment_match = T,
-#                           reloo = TRUE)
-# size.tree <- brms::add_criterion(size.tree, "loo", 
-#                                  moment_match = T,
-#                           reloo = TRUE)
+size.prim.method.tree <- brms::add_criterion(size.prim.method.tree, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
+size.prim.method <- brms::add_criterion(size.prim.method, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
+size.prim.tree <- brms::add_criterion(size.prim.tree, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
+size.prim <- brms::add_criterion(size.prim, "loo",
+                                 moment_match = T,
+                          reloo = TRUE)
 
 # save model output so we don't have to refit each time
-saveRDS(size.prim.method.tree, "output/size_multinomial_prim.method.tree_nb.rds")
-# saveRDS(size.method, "output/size_multinomial_method_nb.rds")
-# saveRDS(size.tree, "output/size_multinomial_tree_nb.rds")
+saveRDS(size.prim.method.tree, "output/size_multinomial_prim.method.tree_nb_swarm1.rds")
+saveRDS(size.prim.method, "output/size_multinomial_prim.method_nb_swarm1.rds")
+saveRDS(size.prim.tree, "output/size_multinomial_prim.tree_nb_swarm1.rds")
+saveRDS(size.prim, "output/size_multinomial_prim_nb_swarm1.rds")
 
 # load the models so we don't have to refit them each time
-size.prim.method.tree <- readRDS("output/size_multinomial_prim.method.tree_nb.rds")
-# size.method <- readRDS("output/size_multinomial_method_nb.rds")
-# size.tree <- readRDS("output/size_multinomial_tree_nb.rds")
+size.prim.method.tree <- readRDS("output/size_multinomial_prim.method.tree_nb_swarm1.rds")
+size.prim.method <- readRDS("output/size_multinomial_prim.method_nb_swarm1.rds")
+size.prim.tree <- readRDS("output/size_multinomial_prim.tree_nb_swarm1.rds")
+size.prim <- readRDS("output/size_multinomial_prim_nb_swarm1.rds")
 
 # evaluating models based on LOOIC
-# brms::loo_compare(size.method.tree, size.method, size.tree, 
-#             criterion = "loo") %>% 
-#   print(simplify = F)
+brms::loo_compare(size.prim.method.tree, size.prim.method, size.prim.tree, size.prim,
+            criterion = "loo") %>%
+  print(simplify = F)
 
-# method is lowest; delta looic = 4.7
+# method is lowest; delta elpd to nearest = -2.6 (2.2 se)
 ```
 # Fig 5 (final) - Multinomial model plots (feeding, life mode, body size)
 ```{r}
@@ -2302,7 +2833,7 @@ thin <- 0.3
 thik <- 0.75
 
 # load the models so we don't have to refit them each time
-fit.prim.method.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb.rds")
+fit.prim.method.tree <- readRDS("output/feed_multinomial_prim.method.tree_nb_swarm1.rds")
 # fit.method <- readRDS("output/feed_multinomial_method_nb.rds")
 # fit.tree <- readRDS("output/feed_multinomial_tree_nb.rds")
 
@@ -2385,7 +2916,7 @@ fits_df %>%
 ### Body size
 
 # load the models so we don't have to refit them each time
-size.prim.method.tree <- readRDS("output/size_multinomial_prim.method.tree_nb.rds")
+size.prim.method.tree <- readRDS("output/size_multinomial_prim.method.tree_nb_swarm1.rds")
 # size.method <- readRDS("output/size_multinomial_method.rds")
 # size.tree <- readRDS("output/size_multinomial_tree.rds")
 
@@ -2466,7 +2997,7 @@ size_fits_df %>%
 ### Life mode
 
 # load the models so we don't have to refit them each time
-life.prim.method.tree <- readRDS("output/life_multinomial_prim.method.tree_nb.rds")
+life.prim.method.tree <- readRDS("output/life_multinomial_prim.method.tree_nb_swarm1.rds")
 # life.method <- readRDS("output/life_multinomial_method_nb.rds")
 # life.tree <- readRDS("output/life_multinomial_tree_nb.rds")
 
@@ -2553,7 +3084,7 @@ life_fits_df %>%
 ### Combine all 3 plots with patchwork
 feed_plot2 / size_plot2 / life_plot2
 
-ggsave("figures/rev_Fig5_guilds_multinom19.jpg",
+ggsave("figures/rev_Fig5_guilds_multinom_swarm1_1.jpg",
        width = 5, height = 12, dpi = 400)
 ```
 # Fig. S1 - Richness, diversity, evenness - by substrate, tree type, primer
@@ -2863,7 +3394,15 @@ zref <- fread("data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.Z.tsv") %>%
   mutate(len = nchar(sequence))
 
 ```
+# summarize read counts by primer
+```{r}
 
+orderreadsC = art_order_reads %>% rowwise() %>% mutate(sumC = sum(c_across(ends_with("coleop")), na.rm = T)) %>% select(order, sumC)
+
+ordersC$pct = ordersC$motus / sum(ordersC$motus)
+ordersZ$pct = ordersZ$motus / sum(ordersZ$motus)
+
+```
 
 
 
