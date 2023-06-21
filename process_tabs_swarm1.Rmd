@@ -373,7 +373,7 @@ Note: there is surely a better way to do this (e.g., using a for loop), but the 
 # library(taxize)
 # 
 # #### adding higher taxa
-# taxlistfull <- sort(unique(c(cc_fin$finaltax, zz_fin$finaltax)))
+taxlistfull <- sort(unique(c(cc_fin$finaltax, zz_fin$finaltax)))
 # taxlist1 <- taxlistfull[1:50]
 # # add taxonomy to the lowest taxa rank based on NCBI database
 # full_tax_lookup1 <- taxize::tax_name(sci = taxlist1,
@@ -409,7 +409,7 @@ Note: there is surely a better way to do this (e.g., using a for loop), but the 
 # taxlist5 <- taxlistfull[201:250]
 # # add orders to the lowest taxa rank based on NCBI database
 # full_tax5_lookup5 <- taxize::tax_name(sci = taxlist5,
-#                    get = c("genus", "family", "order", "class",
+#                    get = c("species", "genus", "family", "order", "class",
 #                            "phylum", "kingdom"),
 #                    db = "ncbi")
 # write.csv(full_tax5_lookup5, "data/full_tax_lookup5.csv", row.names = F)
@@ -494,25 +494,30 @@ Note: there is surely a better way to do this (e.g., using a for loop), but the 
 #                    db = "ncbi")
 # write.csv(full_tax_lookup15, "data/full_tax_lookup15.csv", row.names = F)
 
+# full_taxa_lookup <- read.csv("data/full_tax_lookup1.csv") %>%
+#   bind_rows(read.csv("data/full_tax_lookup2.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup3.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup4.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup5.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup6.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup7.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup8.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup9.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup10.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup11.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup12.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup13.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup14.csv")) %>%
+#   bind_rows(read.csv("data/full_tax_lookup15.csv")) %>%
+#   filter(!is.na(kingdom)) %>%
+#   rename(finaltax = query)
 
-full_taxa_lookup <- read.csv("data/full_tax_lookup1.csv") %>%
-  bind_rows(read.csv("data/full_tax_lookup2.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup3.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup4.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup5.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup6.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup7.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup8.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup9.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup10.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup11.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup12.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup13.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup14.csv")) %>%
-  bind_rows(read.csv("data/full_tax_lookup15.csv")) %>%
-  filter(!is.na(kingdom)) %>%
-  rename(finaltax = query)
+# write.csv(full_taxa_lookup, "data/full_tax_lookup.csv", row.names = F)
+full_taxa_lookup <- read.csv("data/full_tax_lookup.csv") %>%
+  distinct()
 
+# check that some change to the taxonomy in the manual taxonomy curation files did not result in a species not in the lookup table
+full_taxa_lookup$finaltax[full_taxa_lookup$finaltax %notin% taxlistfull]
 
 ```
 # separate the samples and negatives and adjust taxonomy based on match score 
@@ -541,22 +546,12 @@ zz_finID <- zz_fin  %>%
                                     is.na(species) & !is.na(genus) ~ genus,
                                     !is.na(species) ~ species)) %>%
   select(id, finalID, bestmatch, phylum, class, order, family, genus, species,
-         count, wt, starts_with("sample"), sequence, finaltax, blastnotes) 
-
-# check to make sure all species level matches got a species in the final database
-checkIDsZ = zz_finID %>% 
-  select(id, bestmatch, finaltax, species, finalID, blastnotes) %>%
-  filter(bestmatch > 0.99,
-         is.na(species)) %>%
-  arrange(desc(nchar(finaltax)))
-  # note: this revealed ~ possible errors in which final_taxa_lookup didn't include species when it should have
-    # that suggests that you can't rely on taxize get_taxa blindly without checking it carefully
-    # for now, I manually updated the final_taxa_lookup table to correct these errors
-zz_finID <- zz_finID %>% select(-finaltax, -blastnotes)
+         count, wt, starts_with("sample"), sequence) 
 
 # check which columns are negatives
 colnames(zz_finID) # input those column numbers in the next line
 negatives <- c(12,13,21,51:53)
+colnames(as.data.frame(zz_finID)[, negatives])
 
 # select out just the samples
 zs <- zz_finID %>%
@@ -603,21 +598,12 @@ cc_finID <- cc_fin  %>%
                                     is.na(species) & !is.na(genus) ~ genus,
                                     !is.na(species) ~ species)) %>%
   select(id, finalID, bestmatch, phylum, class, order, family, genus, species,
-         count, wt, starts_with("sample"), sequence, finaltax, blastnotes) 
-
-# check to make sure all species level matches got a species in the final database
-checkIDsC = cc_finID %>% 
-  select(id, bestmatch, finaltax, species, finalID, blastnotes) %>%
-  filter(bestmatch > 0.99,
-         is.na(species)) %>%
-  arrange(desc(nchar(finaltax)))
-  # note: this revealed 5 errors in which final_taxa_lookup didn't include species when it should have
-    # that suggests that you can't rely on taxize get_taxa blindly without checking it carefully
-cc_finID <- cc_finID %>% select(-finaltax, -blastnotes)
+         count, wt, starts_with("sample"), sequence) 
 
 # check which columns are negatives
 colnames(cc_finID) # input those column numbers in the next line
 negatives.C <- c(12,13,21,22,53:65)
+colnames(as.data.frame(cc_finID)[,negatives.C])
 
 # select out just the samples
 cs <- cc_finID %>%
@@ -641,7 +627,7 @@ cn$seqmax <- apply(cn[,12:17],1, max)
 # write.csv(cs, file = "data/pinebugs.samples.step0.nofilters.swarm1.C.csv", row.names = F)
 # write.csv(cn, file = "data/pinebugs.negatives.step0.nofilters.swarm1.C.csv", row.names = F)
 ```
-# remove humans, mice, and farm animals
+# remove humans & mice
 ```{r}
 
 ### Coleop
@@ -664,14 +650,13 @@ zs1 <- zs %>%
   filter(genus %notin% c("Mus", "Homo"))
 
 # sum the reads across all samples
-sum(select(zs1, starts_with("sample"))) # 2161052
+sum(select(zs1, starts_with("sample"))) # 4119060
 
 zn1 <- zn %>%
   filter(genus %notin% c("Mus", "Homo"))
 
 # sum the reads across all samples
 sum(select(zn1, starts_with("sample"))) # 997
-
 
 ```
 
@@ -686,7 +671,7 @@ zs2a <- zs1 %>%
   data.frame()
 zs2 <- zs2a
 
-colnames(zs2) # 7:42 are the samples
+colnames(zs2) # 12:47 are the samples
 
 # zero out samples with less reads of a sequence than the max contamination among negative of that sequence
 for(i in 12:47){
@@ -711,7 +696,7 @@ cs2a <- cs1 %>%
   data.frame()
 cs2 <- cs2a
 
-colnames(cs2) # 7:43 are the samples
+colnames(cs2) # 12:48 are the samples
 
 # zero out samples with less reads of a sequence than the max contamination among negative of that sequence
 for(i in 12:48){
@@ -736,7 +721,7 @@ hist(nchar(cs2$sequence))
 
 # check on phylum list and look at MOTUs with no phylum
 unique(zs2$phylum)
-zs2[is.na(zs2$phylum), c("id", "finalID")]
+zs2[is.na(zs2$phylum), c("id", "finalID")] # should be only MOTUs that were best matched to some taxon above phylum
 
 # filter out non-arthropod - samples
 zs3 <- zs2 %>%
@@ -767,7 +752,7 @@ sum(select(zn3, starts_with("sample"))) # 997
 
 # check on phylum list and look at MOTUs with no phylum
 unique(cs2$phylum)
-cs2[is.na(cs2$phylum), c("id", "finalID")]
+cs2[is.na(cs2$phylum), c("id", "finalID")] # should be only MOTUs that were best matched to some taxon above phylum
 
 # filter out non-arthropod - samples
 cs3 <- cs2 %>%
@@ -778,7 +763,7 @@ names(cs3)
 cs3$sampsum <- apply(cs3[,12:48], 1, sum)
 
 # sum the reads across all samples
-sum(select(cs3, starts_with("sample"))) # 2069901
+sum(select(cs3, starts_with("sample"))) # 2068121
 
 # filter out non-fish - negatives
 cn3 <- cn1 %>%
@@ -801,7 +786,7 @@ sum(select(cn3, starts_with("sample"))) # 3402
 
 ### Zeale ###
 
-# what species; n = 186 (note: was 158 with swarm d = 7)
+# what species; n = 196 (note: was 158 with swarm d = 7)
 zs3 %>% filter(!is.na(species),
                sampsum > 0) %>% 
   select(species) %>%
@@ -830,28 +815,28 @@ zs3 %>% filter(!is.na(order)) %>%
 
 ### Coleop ###
 
-# what species; n = 105 (was 94 with swarm d = 5)
+# what species; n = 110 (was 94 with swarm d = 5)
 cs3 %>% filter(!is.na(species),
                sampsum > 0) %>% 
   select(species) %>%
   arrange(species) %>%
   distinct()
 
-# what genus; n = 178 (was 154)
+# what genus; n = 177 (was 154)
 cs3 %>% filter(!is.na(genus),
                sampsum > 0) %>% 
   select(genus) %>%
   arrange(genus) %>%
   distinct()
 
-# what families; n = 128 (was 123)
+# what families; n = 127 (was 123)
 cs3 %>% filter(!is.na(family),
                sampsum > 0) %>% 
   select(family) %>%
   arrange(family) %>%
   distinct()
 
-# what orders; n = 24 (was 23)
+# what orders; n = 23 (was 23)
 cs3 %>% filter(!is.na(order),
                sampsum > 0) %>% 
   select(order) %>%

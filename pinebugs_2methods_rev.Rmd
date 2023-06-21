@@ -185,8 +185,8 @@ colnames(art_full)[9:46] <- c(new_col_names)
 colnames(art_full) # check that it worked
 
 # look at read depth
-sort(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample")), na.rm = T))
-sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample")), na.rm = T))
+sort(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample")), na.rm = T)) # 55895.16
+sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample")), na.rm = T)) # 114346.5
 
 mean(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"), -sample.sum), na.rm = T))
 mean(sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T))[2:37])
@@ -197,8 +197,8 @@ zsd <- sd(sort(colSums(select(filter(art_full, primer == "zeale"), starts_with("
 cn <- sum(colSums(select(filter(art_full, primer == "coleop"), starts_with("sample"), -sample.sum), na.rm = T)>0)
 zn <- sum(colSums(select(filter(art_full, primer == "zeale"), starts_with("sample"), -sample.sum), na.rm = T)>0)
 
-(cse <- csd/sqrt(cn))
-(zse <- zsd/sqrt(zn))
+(cse <- csd/sqrt(cn)) # 5377.911
+(zse <- zsd/sqrt(zn)) # 6455.183
 
 # make family-lineage lookup table
 lineage_lookup <- art_full %>%
@@ -361,7 +361,7 @@ rollZ_sp_mat[rollZ_sp_mat>0] <- 1
 colnames(rollZ_sp_mat) <- art_sp_reads$species
 
 # both - zeale - sp level
-zeromat.sp <- matrix(0,1,270)
+zeromat.sp <- matrix(0,1,286)
 sprayZ_sp_mat2 <- rbind(sprayZ_sp_mat[1:2,],
                          zeromat.sp,
                          sprayZ_sp_mat[3:9,],
@@ -747,10 +747,10 @@ orders_df %>%
 library(patchwork)
 hdiv_plot / ldiv_plot
 
-ggsave("figures/rev_Fig1_ordermotus_swarm1_1.png", height = 9, width = 7.5, dpi = 400)
+ggsave("figures/rev_Fig1_nosub_ordermotus_swarm1_1.png", height = 9, width = 7.5, dpi = 400)
 
 ```
-# Fig. 4 (alternate) - this time including leaves vs. bark
+# Fig. 1 (new) - this time including leaves vs. bark
 # Plot relative abundance of orders by method (for each primer set)
 % of samples detected
 ```{r}
@@ -998,8 +998,8 @@ orders_df2 %>%
 library(patchwork)
 hdiv_plot / ldiv_plot
 
-# ggsave("figures/rev_Fig1alt_ordermotussub_swarm1_1.png",
-#        height = 9, width = 7.5, dpi = 400)
+ggsave("figures/rev_Fig1alt_ordermotussub_swarm1_2.png",
+       height = 9, width = 7.5, dpi = 400)
 
 ```
 # Table 1. composition of MOTUs
@@ -1064,6 +1064,113 @@ kable(orders_df3, "html") %>%
 
 
 ```
+# Table 1 (alt): mean reads by order and sample method
+```{r}
+master <- art_full  %>%
+  mutate(engname = case_when(order == "Mesostigmata" ~ "Mites",
+                          order == "Sarcoptiformes" ~ "Mites",
+                          order == "Trombidiformes" ~ "Mites",
+                          class == "Collembola" ~ "Springtails",
+                          class == "Chilopoda" ~ "Centipedes",
+                          order == "Araneae" ~ "Spiders",
+                          order == "Opiliones" ~ "Harvestmen",
+                          order == "Blattodea" ~ "Cockroaches",
+                          order == "Coleoptera" ~ "Beetles",
+                          order == "Dermaptera" ~ "Earwigs",
+                          order == "Diptera" ~ "Flies",
+                          order == "Ephemeroptera" ~ "Mayflies",
+                          order == "Hemiptera" ~ "True bugs",
+                          order == "Hymenoptera" ~ "Bees, wasps, & ants",
+                          order == "Lepidoptera" ~ "Butterflies & moths",
+                          order == "Mantodea" ~ "Mantids",
+                          order == "Megaloptera" ~ "Dobsonflies",
+                          order == "Cyclopoida" ~ "Copepods",
+                          order == "Neuroptera" ~ "Lacewings",
+                          order == "Odonata" ~ "Dragonflies & damselflies",
+                          order == "Orthoptera" ~ "Crickets & grasshoppers",
+                          order == "Phasmatodea" ~ "Walking sticks",
+                          order == "Phthiraptera" ~ "Thrips",
+                          order == "Psocoptera" ~ "Bark lice",
+                          order == "Siphonaptera" ~ "Fleas",
+                          order == "Trichoptera" ~ "Caddisflies"
+                          ))
+
+# format data for spray samples
+orderreads_spray <- master %>%
+  filter(!is.na(order)) %>%
+  group_by(engname, primer) %>%
+  summarize(across(contains(c("CS", "DS")), sum),
+            .groups = "drop") %>%
+  rowwise() %>% 
+  mutate(sample.sum = sum(c_across(contains(c("CS", "DS"))), na.rm = T),
+         sample.mean = mean(c_across(contains(c("CS", "DS"))), na.rm = T),
+         sample.sd = sd(c_across(contains(c("CS", "DS"))), na.rm = T),
+         sample.n = sum(!is.na(c_across(contains(c("CS", "DS")))), na.rm = T),
+         sample.pres = sum((c_across(contains(c("CS", "DS")))>0), na.rm = T)) %>%
+  ungroup() %>%
+  mutate(sample.se = sample.sd / sqrt(sample.n),
+         sample.pct = 100*(sample.pres / sample.n)) %>%
+  right_join(expand.grid(engname = unique(master$engname), primer = c("coleop", "zeale"))) %>%
+  filter(!is.na(engname)) %>%
+  select(engname, primer, contains(c("mean", ".se", "pct"))) %>%
+  tidyr::replace_na(list(sample.mean = 0, sample.pct = 0, sample.se = 0)) %>%
+  mutate(US_meanse = paste0(round(sample.mean,0), " (", round(sample.se, 0), ")"), # \u00B1 
+         US_pct = round(sample.pct,1)) %>%
+  rename(US_mean = sample.mean) %>%
+  left_join(distinct(select(master, class, engname))) %>%
+  arrange(primer, class, desc(US_mean)) %>%
+  pivot_wider(id_cols = c(engname), names_from = primer, values_from = c(US_meanse, US_pct, US_mean)) %>%
+  left_join(distinct(select(master, class, engname)))
+
+# format data for roller samples
+orderreads_roll <- master %>%
+  filter(!is.na(order)) %>%
+  group_by(engname, primer) %>%
+  summarize(across(contains(c("CR", "DR")), sum),
+            .groups = "drop") %>%
+  rowwise() %>% 
+  mutate(sample.sum = sum(c_across(contains(c("CR", "DR"))), na.rm = T),
+         sample.mean = mean(c_across(contains(c("CR", "DR"))), na.rm = T),
+         sample.sd = sd(c_across(contains(c("CR", "DR"))), na.rm = T),
+         sample.n = sum(!is.na(c_across(contains(c("CR", "DR")))), na.rm = T),
+         sample.pres = sum((c_across(contains(c("CR", "DR")))>0), na.rm = T)) %>%
+  ungroup() %>%
+  mutate(sample.se = sample.sd / sqrt(sample.n),
+         sample.pct = 100*(sample.pres / sample.n)) %>%
+  right_join(expand.grid(engname = unique(master$engname), primer = c("coleop", "zeale"))) %>%
+  filter(!is.na(engname)) %>%
+  select(engname, primer, contains(c("mean", ".se", "pct"))) %>%
+  tidyr::replace_na(list(sample.mean = 0, sample.pct = 0, sample.se = 0)) %>%
+  mutate(B_meanse = paste0(round(sample.mean,0), " (", round(sample.se, 0), ")"), # \u00B1 
+         B_pct = round(sample.pct,1)) %>%
+  rename(B_mean = sample.mean) %>%
+  left_join(distinct(select(master, class, engname))) %>%
+  arrange(primer, class, desc(B_mean)) %>%
+  pivot_wider(id_cols = c(engname), names_from = primer, values_from = c(B_meanse, B_pct, B_mean)) %>%
+  left_join(distinct(select(master, class, engname)))
+
+
+# combine  read count datasets into one for table
+
+ordereads_df <- orderreads_spray %>%
+  left_join(orderreads_roll) %>%
+  rowwise() %>%
+  mutate(sort = mean(c_across(contains(c("B_mean_", "US_mean_"))))) %>%
+  ungroup() %>%
+  arrange(class, desc(sort)) %>%
+  select(class, engname, B_meanse_zeale, B_pct_zeale, US_meanse_zeale, US_pct_zeale,
+         B_meanse_coleop, B_pct_coleop, US_meanse_coleop, US_pct_coleop)
+  
+library(knitr)
+library(kableExtra)
+library(magrittr)
+
+kable(ordereads_df, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  cat(., file = "figures/table1_reads_tally.html")
+
+```
+
 # Fig. 2 (new) - accumulation curves using iNEXT
 ```{r}
 
