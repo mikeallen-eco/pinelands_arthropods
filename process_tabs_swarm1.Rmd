@@ -688,6 +688,8 @@ rm(zs2a)
 hist(nchar(zs2$sequence))
 # zs2$len <- nchar(zs2$sequence)
 
+# write.csv(zs2, "data/pinebugs.samples.step2.negsub.swarm1.Z.csv")
+
 #### Coleop ####
 
 # add the max reads by sequence in all the negatives
@@ -712,6 +714,8 @@ rm(cs2a)
 # look at sequence lengths
 hist(nchar(cs2$sequence))
 # cs2$len <- nchar(cs2$sequence)
+
+# write.csv(cs2, "data/pinebugs.samples.step2.negsub.swarm1.C.csv")
 
 ```
 # remove non-arthropods

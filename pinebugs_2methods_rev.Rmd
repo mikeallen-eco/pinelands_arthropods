@@ -1092,12 +1092,14 @@ master <- art_full  %>%
                           order == "Phthiraptera" ~ "Thrips",
                           order == "Psocoptera" ~ "Bark lice",
                           order == "Siphonaptera" ~ "Fleas",
-                          order == "Trichoptera" ~ "Caddisflies"
+                          order == "Trichoptera" ~ "Caddisflies",
+                          (is.na(order) & is.na(class) & phylum == "Arthropoda") ~ "Arthropod sp.",
+                          (is.na(order) & !is.na(class) ~ paste0(class, " sp."))
                           ))
 
 # format data for spray samples
 orderreads_spray <- master %>%
-  filter(!is.na(order)) %>%
+  # filter(!is.na(order)) %>%
   group_by(engname, primer) %>%
   summarize(across(contains(c("CS", "DS")), sum),
             .groups = "drop") %>%
@@ -1167,7 +1169,7 @@ library(magrittr)
 
 kable(ordereads_df, "html") %>%
   kable_styling(bootstrap_options = c("striped", "hover")) %>%
-  cat(., file = "figures/table1_reads_tally.html")
+  cat(., file = "figures/table1_reads_tally_2.html")
 
 ```
 
@@ -1405,114 +1407,8 @@ library(patchwork)
 motuplot.primer + motuplot.sub + plot_spacer() + spplot.primer + spplot.sub + 
   genplot.primer + genplot.sub + plot_spacer() + famplot.primer + famplot.sub + 
   plot_layout(ncol = 5, widths = c(0.5, 0.5, 0.15, 0.5, 0.5, 0.5, 0.5, 0.15, 0.5, 0.5))
-ggsave("figures/rev_Fig2new_accumcurves.swarm1_15.png", dpi = 400, width = 11, height = 10)
+ggsave("figures/rev_Fig2new_accumcurves.swarm1_16.png", dpi = 400, width = 11, height = 10)
 
-
-```
-# Fig. 2 (old) - construct accumulation curves using iNEXT
-```{r}
-
-# format data for iNEXT
-accum.data.motu <- list('Understory (COI)' = t(sprayZ_motu_mat),
-                 'Bark (COI)' = t(rollZ_motu_mat),
-                 'Both substrates (COI)' = t(bothZ_motu_mat),
-                 'Understory (16S)' = t(sprayC_motu_mat),
-                 'Bark (16S)' = t(rollC_motu_mat),
-                 'Both substrates (16S)' = t(bothC_motu_mat))
-
-accum.data.sp <- list('Understory (COI)' = t(sprayZ_sp_mat),
-                 'Bark (COI)' = t(rollZ_sp_mat),
-                 'Both substrates (COI)' = t(bothZ_sp_mat),
-                 'Understory (16S)' = t(sprayC_sp_mat),
-                 'Bark (16S)' = t(rollC_sp_mat),
-                 'Both substrates (16S)' = t(bothC_sp_mat))
-
-accum.data.sp.pooled <- list(
-                 'Both substrates (COI)' = t(bothZ_sp_mat),
-                 'Both substrates (16S)' = t(bothC_sp_mat),
-                 'Both substrates (both primers)' = t(bothCZ_sp_mat))
-
-accum.data.gen <- list('Understory (COI)' = t(sprayZ_gen_mat),
-                 'Bark (COI)' = t(rollZ_gen_mat),
-                 'Both substrates (COI)' = t(bothZ_gen_mat),
-                 'Understory (16S)' = t(sprayC_gen_mat),
-                 'Bark (16S)' = t(rollC_gen_mat),
-                 'Both substrates (16S)' = t(bothC_gen_mat))
-
-accum.data.fam <- list('Understory (COI)' = t(sprayZ_fam_mat),
-                 'Bark (COI)' = t(rollZ_fam_mat),
-                 'Both substrates (COI)' = t(bothZ_fam_mat),
-                 'Understory (16S)' = t(sprayC_fam_mat),
-                 'Bark (16S)' = t(rollC_fam_mat),
-                 'Both substrates (16S)' = t(bothC_fam_mat))
-
-accum.data.motu.primers <- list('Both substrates (COI)' = t(bothZ_motu_mat),
-                 'Both substrates (16S)' = t(bothC_motu_mat))
-
-# run accumulation curve analyses in iNEXT
-accum.motu <- iNEXT(accum.data.motu, q=0, datatype="incidence_raw", endpoint = 60)
-# accum.motu$iNextEst$coverage_based
-
-accum.sp <- iNEXT(accum.data.sp, q=0, datatype="incidence_raw", endpoint = 60)
-# accum.sp$iNextEst$coverage_based
-
-accum.gen <- iNEXT(accum.data.gen, q=0, datatype="incidence_raw", endpoint = 60)
-# accum.gen$iNextEst$coverage_based
-
-accum.fam <- iNEXT(accum.data.fam, q=0, datatype="incidence_raw", endpoint = 60)
-# accum.fam$iNextEst$coverage_based
-
-accum.sp.pooled <- iNEXT(accum.data.sp.pooled, q=0, datatype="incidence_raw", endpoint = 60)
-# accum.sp.pooled$iNextEst$coverage_based
-
-# create plots for motu, sp, genus, family
-(motuplot <-
-ggiNEXT(accum.motu, type=1, se=TRUE, 
-        facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,60)) +
-  labs(y = "No. MOTUs") +
-    theme_bw() +
-  theme(text = element_text(size = 14)) +
-  guides(color = "none", shape = "none", fill = "none", linetype = "none")
-)
-
-(spplot <-
-ggiNEXT(accum.sp, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,60)) +
-  labs(y = "No. species identified") +
-    theme_bw() +
-  theme(text = element_text(size = 14)) +
-  guides(color = "none", shape = "none", fill = "none", linetype = "none")
-)
-
-(genplot <-
-ggiNEXT(accum.gen, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,60)) +
-  labs(y = "No. genera identified") +
-    theme_bw() +
-  theme(text = element_text(size = 14)) +
-  guides(color = "none", shape = "none", fill = "none", linetype = "none")
-)
-
-(famplot <- 
-ggiNEXT(accum.fam, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
-  scale_x_continuous(limits = c(0,60)) +
-  labs(y = "No. families identified") +
-    theme_bw() +
-  theme(text = element_text(size = 15),
-        legend.position = c(.78, .19)) +
-  guides(linetype = "none") +
-  theme(legend.key.size = unit(.12, 'cm'), #change legend key size
-        legend.key.height = unit(.12, 'cm'), #change legend key height
-        legend.key.width = unit(.12, 'cm'), #change legend key width
-        legend.title = element_text(size=12), #change legend title font size
-        legend.text = element_text(size=12)) #change legend text font size
-)
-
-library(patchwork)
-(motuplot + spplot) / (genplot + famplot)
-# ggsave("figures/rev1_accumcurves.png", width = 12, height = 5, dpi = 400) # 3-panel
-ggsave("figures/rev_Fig1_accumcurves.swarm1_2.png", width = 12, height = 10, dpi = 400) # 4-panel
 
 ```
 # Fig. 3 - Richness, diversity, evenness - by substrate, tree type, primer
@@ -1668,19 +1564,19 @@ library(brms)
 (Smod <- readRDS("output/Smod_swarm1.rds"))
 # *** = 99% don't overlap; ** = 95% don't overlap; * = 90% don't overlap
 #                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            3.67      0.12     3.44     3.90 1.00    10329     5941
-# treeDeciduous        0.20      0.12    -0.05     0.43 1.00    10371     6484
-# methodUnderstory     0.60      0.12     0.36     0.85 1.00     9017     5652***
-# primerCOI           -0.71      0.12    -0.95    -0.48 1.00     9787     6310***
+# Intercept            3.67      0.11     3.45     3.90 1.00    10828     6523
+# treeDeciduous        0.19      0.12    -0.04     0.43 1.00    10222     5893
+# methodUnderstory     0.60      0.13     0.34     0.84 1.00    10486     5931***
+# primerCOI           -0.71      0.12    -0.95    -0.47 1.00    10306     6053***
 
 
 library(tidybayes)
 quantile(spread_draws(Smod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-# -0.01400608  0.38811674 
+# -0.005369158  0.393345586
 quantile(spread_draws(Smod, b_methodUnderstory)$b_methodUnderstory, c(0.005, 0.995)) 
-# 0.2655983 0.9279090  
+# 0.2669806 0.9223578 
 quantile(spread_draws(Smod, b_primerCOI)$b_primerCOI, c(0.005, 0.995)) 
-# -1.0281707 -0.4169117 
+# -1.0213068 -0.3900637 
 
 Smod_df <- conditional_effects(Smod, prob = 0.95) %>%
   do.call(rbind, .) %>%
@@ -1711,25 +1607,25 @@ Smod_df %>%
 
 # Evenness model
 
-  library(brms)
- # (Simpmod <- brm(simpson ~ tree + method + primer, data = simpson_df20, cores = 4,
- #                 iter = 4000, warmup = 2000))
- # saveRDS(Simpmod, "output/Simpmod_swarm1.rds")
+library(brms)
+(Simpmod <- brm(simpson ~ tree + method + primer, data = simpson_df20, cores = 4,
+                 iter = 4000, warmup = 2000))
+saveRDS(Simpmod, "output/Simpmod_swarm1.rds")
 (Simpmod <- readRDS("output/Simpmod_swarm1.rds"))
 #                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            0.50      0.07     0.36     0.63 1.00    10184     5924
-# treeDeciduous        0.09      0.07    -0.05     0.22 1.00    11007     5805
-# methodUnderstory     0.13      0.07    -0.01     0.28 1.00    10281     5852*
-# primerCOI           -0.13      0.07    -0.26     0.01 1.00    10235     6063*
+# Intercept            0.49      0.07     0.36     0.62 1.00     9793     5680
+# treeDeciduous        0.09      0.07    -0.04     0.22 1.00    10230     6008
+# methodUnderstory     0.13      0.07    -0.01     0.28 1.00     9909     5618*
+# primerCOI           -0.13      0.07    -0.26     0.01 1.00     9516     5528*
 
 library(tidybayes)
 get_variables(Simpmod)
 quantile(spread_draws(Simpmod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-# -0.02774543  0.20388438
+# -0.02580985  0.20343333
 quantile(spread_draws(Simpmod, b_methodUnderstory)$b_methodUnderstory, c(0.05, 0.95))
-# 0.01001708 0.25452282   
+# 0.006811066 0.255324083   
 quantile(spread_draws(Simpmod, b_primerCOI)$b_primerCOI, c(0.05, 0.95))
-# -0.240993801 -0.009948897 
+# -0.24031020 -0.01036529 
 
 Simpmod_df <- conditional_effects(Simpmod, prob = 0.95) %>%
   do.call(rbind, .) %>%
@@ -1760,24 +1656,24 @@ Simpmod_df %>%
   
 # Diversity model
  # library(brms)
- # (Shanmod <- brm(shannon ~ tree + method + primer, data = shannon_df20, cores = 4,
- #                 iter = 4000, warmup = 2000))
-# saveRDS(Shanmod, "output/Shanmod_swarm1.rds")
+(Shanmod <- brm(shannon ~ tree + method + primer, data = shannon_df20, cores = 4,
+                iter = 4000, warmup = 2000))
+saveRDS(Shanmod, "output/Shanmod_swarm1.rds")
 Shanmod <- readRDS("output/Shanmod_swarm1.rds")
 #                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            1.17      0.20     0.77     1.57 1.00     9655     5989
-# treeDeciduous        0.30      0.22    -0.11     0.71 1.00     9306     6024
-# methodUnderstory     0.70      0.22     0.27     1.14 1.00    10610     6467***
-# primerCOI           -0.35      0.21    -0.78     0.07 1.00     9983     5895*
+# Intercept            1.16      0.20     0.76     1.58 1.00    10431     5892
+# treeDeciduous        0.31      0.21    -0.11     0.73 1.00    10234     5446
+# methodUnderstory     0.70      0.22     0.25     1.13 1.00     9907     6195
+# primerCOI           -0.35      0.21    -0.78     0.07 1.00     9621     6030
 
 library(tidybayes)
 get_variables(Shanmod)
 quantile(spread_draws(Shanmod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-# -0.04712158  0.65368848
+# -0.04239202  0.66780805
 quantile(spread_draws(Shanmod, b_methodUnderstory)$b_methodUnderstory, c(0.995, 0.005))
-# 1.2695077 0.1182835
+# 1.2832153 0.1094667
 quantile(spread_draws(Shanmod, b_primerCOI)$b_primerCOI, c(0.05, 0.95))
-# -0.7017889342 -0.0009793297 
+# -0.703774494  0.002741203 
 
 Shanmod_df <- conditional_effects(Shanmod, prob = 0.95) %>%
   do.call(rbind, .) %>%
@@ -1791,7 +1687,7 @@ Shanmod_df <- conditional_effects(Shanmod, prob = 0.95) %>%
 Shanmod_ann <- data.frame(var = c("Tree type", "Substrate", "Primer set"),
                        x = 1.5,
                        y = .1,
-                       label = c("", "***", "*"))
+                       label = c("", "***", ""))
 
 (Shanplot <-
 Shanmod_df %>%
@@ -1813,7 +1709,7 @@ gg = gridExtra::arrangeGrob(Shanplot, Splot, Simpplot)
 
 plot(gg)
 
-# ggsave(plot = gg, filename = "figures/rev_Fig3_rarediversity_swarm1_7.png", 
+# ggsave(plot = gg, filename = "figures/rev_Fig3_rarediversity_swarm1_8.png",
 #        height = 9, width = 4, dpi = 400)
 ```
 # Fig. 4A - NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
@@ -1871,7 +1767,7 @@ set.seed(110)
 #                      k=2, distance = 'jaccard', trymax = 10000)
 # saveRDS(arthNMDS.sp, "output/arthNMDS.sp.swarm1.rds")
 arthNMDS.sp <- readRDS("output/arthNMDS.sp.rds")
-arthNMDS.sp # stress: 0.0964
+arthNMDS.sp # stress: 0.1201
 
 plot1 <- ordiplot(arthNMDS.sp, choices = c(1, 2))
 
@@ -1914,7 +1810,7 @@ str(sites.long1)
       size = 3,
       alpha = 0.85
     ) +
-    annotate("text", x = -1.75, y = -0.67, label = "Stress = 0.096", hjust = 0, size = 3) +
+    annotate("text", x = -1.75, y = -1.1, label = "Stress = 0.120", hjust = 0, size = 3) +
     # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
@@ -1939,11 +1835,11 @@ perm_arth <- adonis2(mds.data.sp.nb ~ primer + method + tree, data = env.data,
 
 perm_arth
 #          Df SumOfSqs      R2      F Pr(>F)    
-# primer    1   3.6424 0.11623 9.5804 0.0001 ***
-# method    1   1.3288 0.04240 3.4952 0.0001 ***
-# tree      1   0.5141 0.01641 1.3523 0.0626 .  
-# Residual 68  25.8529 0.82496                  
-# Total    71  31.3382 1.00000             
+# primer    1   3.5815 0.11396 9.3583 0.0001 ***
+# method    1   1.2959 0.04123 3.3862 0.0001 ***
+# tree      1   0.5260 0.01674 1.3744 0.0526 .  
+# Residual 68  26.0238 0.82807                  
+# Total    71  31.4272 1.00000            
 
 ### genus level ###
 
@@ -1972,7 +1868,7 @@ set.seed(110)
 #                      k=2, distance = 'jaccard', trymax = 10000)
 # saveRDS(arthNMDS.gen, "output/arthNMDS.gen.swarm1.rds")
 arthNMDS.gen <- readRDS("output/arthNMDS.gen.swarm1.rds")
-arthNMDS.gen # stress = 0.1615
+arthNMDS.gen # stress = 0.16148
 
 plot1.gen <- ordiplot(arthNMDS.gen, choices = c(1, 2))
 
@@ -2143,12 +2039,7 @@ perm_arth.fam
 # Residual 69  19.7265 0.78646                   
 # Total    72  25.0826 1.00000  
 
-library(patchwork)
-plot.sp / plot.gen / plot.fam #+ 
-  # plot_layout(widths = c(3, 3, 3),
-              # heights = c(3,3,3))
-
-# ggsave("figures/rev2_nmds_all_swarm1_1.png", height = 9, width = 3, dpi = 400)
+# plot will be saved in the next step (Fig. 4B)
 ```
 # Fig. 4B - Count up taxa by method and make Venn diagram
 ```{r}
@@ -2219,17 +2110,6 @@ library(ggVennDiagram)
   scale_color_manual(values = c(rep("darkgray", 4))) +
   labs(fill = "")
 )
-
-# library(ggvenn)
-# (vennfam <- ggvenn(
-#   venn_methods_fam, 
-#   fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
-#   # blue, yellow, gray, red
-#   stroke_size = 0.6, set_name_size = 3,
-#   text_size = 2.25
-#   ) + scale_x_continuous(expand = expansion(mult = .2)) #+
-#   #ggtitle("Family")
-# )
 
 # pairwise overlap (manually counted from Venn diagram)
 # leaves-bark: 96 overlapping of 179 total (54% overlap)
@@ -2305,23 +2185,11 @@ library(ggVennDiagram)
   labs(fill = "")
 )
 
-# library(ggvenn)
-# (venngen <- ggvenn(
-#   venn_methods_gen, 
-#   fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
-#   # blue, yellow, gray, red
-#   stroke_size = 0.6, set_name_size = 3,
-#   text_size = 2.25
-#   ) + scale_x_continuous(expand = expansion(mult = .2))#+
-#   #ggtitle("Genus")
-# )
-
 # pairwise overlap (manually counted from Venn diagram)
 # leaves-bark: 111 overlapping of 354 total (31% overlap)
 unique(c(Z_spray.gen$genus, C_spray.gen$genus))[unique(c(Z_spray.gen$genus, C_spray.gen$genus)) %in% unique(c(Z_roll.gen$genus, C_roll.gen$genus))]
 # COI-16S: 48 overlapping of 354 total (14% overlap)
 unique(c(Z_spray.gen$genus, Z_roll.gen$genus))[unique(c(Z_spray.gen$genus, Z_roll.gen$genus)) %in% unique(c(C_roll.gen$genus, C_spray.gen$genus))]
-# conif-decid: XX overlapping of XX total (xx% overlap)
 
 ### species
 
@@ -2331,33 +2199,33 @@ Z_spray.sp <- art_sp_reads %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(species) %>%
-  distinct() # 143 for zeale/spray
+  distinct() # 148 for zeale/spray
 
 Z_roll.sp <- art_sp_reads %>%
   select(species, contains(c("CR_zeale", "DR_zeale"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(species) %>%
-  distinct() # 81 for zeale/roll
+  distinct() # 87 for zeale/roll
 
 C_spray.sp <- art_sp_reads %>%
   select(species, contains(c("CS_coleop", "DS_coleop"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(species) %>%
-  distinct() # 92 for coleop/spray
+  distinct() # 95 for coleop/spray
 
 C_roll.sp <- art_sp_reads %>%
   select(species, contains(c("CR_coleop", "DR_coleop"))) %>%
    mutate(sum = rowSums(across(where(is.numeric)))) %>%
   filter(sum > 0) %>%
   select(species) %>%
-  distinct() # 47 for coleop/roll
+  distinct() # 50 for coleop/roll
 
 # get unique genera within each method (change names to get different combos)
-# zeale has 186 sp (166 of which are not found in coleop)
-# coleop has 104 sp (84 of which are not found in zeale)
-# so they only share 20 species in common, zeale has 166 unique sp, coleop has 85 unique sp
+# zeale has 196 sp (176 of which are not found in coleop)
+# coleop has 110 sp (90 of which are not found in zeale)
+# so they only share 20 species in common, zeale has 176 unique sp, coleop has 90 unique sp
 (C_uni.sp <- C_spray.sp %>%
     bind_rows(C_roll.sp) %>%
     distinct() %>%
@@ -2391,43 +2259,19 @@ library(ggVennDiagram)
   labs(fill = "")
 )
 
-# library(ggvenn)
-# (vennsp <- ggvenn(
-#   venn_methods_sp, 
-#   fill_color = c("#EFC000FF", "#868686FF", "#CD534CFF", "#0073C2FF"),
-#   # blue, yellow, gray, red
-#   stroke_size = 0.6, set_name_size = 3,
-#   text_size = 2.25
-#   ) + scale_x_continuous(expand = expansion(mult = .2))#+
-#   #ggtitle("Species")
-# )
-
 # pairwise overlap (manually counted from Venn diagram)
-# leaves-bark: 67 overlapping of 271 total (25% overlap)
+# leaves-bark: 69 overlapping of 286 total (24% overlap)
 unique(c(Z_spray.sp$species, C_spray.sp$species))[unique(c(Z_spray.sp$species, C_spray.sp$species)) %in% unique(c(Z_roll.sp$species, C_roll.sp$species))]
-# COI-16S: 20 overlapping of 271 total (7% overlap)
+# COI-16S: 20 overlapping of 286 total (7% overlap)
 unique(c(Z_spray.sp$species, Z_roll.sp$species))[unique(c(Z_spray.sp$species, Z_roll.sp$species)) %in% unique(c(C_spray.sp$species, C_roll.sp$species))]
-# conif-decid: XX overlapping of XX total (xx% overlap)
 
 library(patchwork)
 
 plot.sp + plot_spacer() + vennsp + plot.gen + plot_spacer() + venngen + plot.fam + plot_spacer() + vennfam + 
   plot_layout(ncol = 3, widths = c(1,.1,1,1,.1,1,1,.1,1))
 
-ggsave(filename = "figures/rev_Fig4_nmdsvenn_all_swarm1_10.png",
-       height = 10, width = 7, dpi = 400)
-
-# gg = gridExtra::arrangeGrob(plot.sp, vennsp, plot.gen, 
-#                             venngen, plot.fam, vennfam)
-# 
-# plot(gg)
-
-# ggsave(plot = gg, filename = "figures/rev_Fig4_nmdsvenn_all_swarm1_3.png", 
+# ggsave(filename = "figures/rev_Fig4_nmdsvenn_all_swarm1_11.png",
 #        height = 10, width = 7, dpi = 400)
-
-# rm(art_spray, art_water, art_roll, art_soil,
-#    soil_unique, spray_unique, roll_unique, water_unique,
-#    venn_methods)
 ```
 # Fig 5 (part 1) - multinomial models for feeding guild data
 https://discourse.mc-stan.org/t/example-with-family-multinomial/8707
@@ -3338,301 +3182,7 @@ plot(gg)
 ggsave(plot = gg, filename = "figures/rev_FigS1_rarediversity_swarm1_1.png", 
        height = 9, width = 4, dpi = 400)
 ```
-# Fig. S1 (old) - Richness, diversity, evenness - by substrate, tree type, primer
-# rarefied to 40000 reads (drops 12 samples)
-Plots & models of rarefied species richness, shannon & simpson indexes, relative read frequency by primer
-```{r}
 
-# MOTU rarefied species richness by sample and primer set
-names(art_full) # to get column numbers of matrix
-data_cols <- 9:45
-coleop_rare_mat <- art_full %>%
-  filter(primer == "coleop") %>%
-  select(all_of(data_cols)) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column() %>%
-  rowwise() %>% 
-  mutate(sample.sum = sum(c_across(starts_with("V")), na.rm = T)) %>%
-  as.data.frame()
-rownames(coleop_rare_mat) <- coleop_rare_mat$rowname
-
-zeale_rare_mat <- art_full %>%
-  filter(primer == "zeale") %>%
-  select(all_of(data_cols)) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column() %>%
-  rowwise() %>% 
-  mutate(sample.sum = sum(c_across(starts_with("V")), na.rm = T)) %>%
-  as.data.frame()
-rownames(zeale_rare_mat) <- zeale_rare_mat$rowname
-
-# get list of samples with low read depth (< 40000)
-
-lowreadsampsC40 <- coleop_rare_mat %>%
-  filter(sample.sum < 40000); (lowreadsampsC40 <- lowreadsampsC40$rowname)
-
-lowreadsampsZ40 <- zeale_rare_mat %>%
-  filter(sample.sum < 40000); (lowreadsampsZ40 <- lowreadsampsZ40$rowname)
-
-unique(c(lowreadsampsC40, lowreadsampsZ40))
-
-# create versions of the dataset with only samples reaching threshold read depths
-
-# 40000 threshold removes 12 samples ...
-coleop_rare_mat40 <- coleop_rare_mat %>%
-  filter(rowname %notin% unique(c(lowreadsampsC40, lowreadsampsZ40))) %>%
-  select(-rowname)
-
-zeale_rare_mat40 <- zeale_rare_mat %>%
-  filter(rowname %notin% unique(c(lowreadsampsC40, lowreadsampsZ40))) %>%
-  select(-rowname)
-
-# get lowest number of reads, excluding the 12 samples with < 40,000
-minreads40 <- min(c(coleop_rare_mat40$sample.sum, zeale_rare_mat40$sample.sum))
-
-rarefy_coleop40 <-rarefy(select(coleop_rare_mat40,-sample.sum), 
-                         minreads40, se = T)
-rarefy_zeale40 <- rarefy(select(zeale_rare_mat40,-sample.sum), 
-                         minreads40, se = T)
-
-rarefy_coleop_df40 <- rarefy_coleop40 %>%
-  t() %>%
-  as.data.frame() %>%
-  bind_cols(colnames(rarefy_coleop40),.) %>%
-  rename(sample = 1) %>%
-  mutate(primer = "16S")
-
-rarefy_zeale_df40 <- rarefy_zeale40 %>%
-  t() %>%
-  as.data.frame() %>%
-  bind_cols(colnames(rarefy_zeale40),.) %>%
-  rename(sample = 1) %>%
-  mutate(primer = "COI")
-
-rarefy_df40 <- rarefy_coleop_df40 %>%
-  bind_rows(rarefy_zeale_df40) %>%
-  mutate(method = stringr::str_sub(sample, -1,-1),
-         tree = stringr::str_sub(sample, -2,-2)) %>%
-  mutate(method = case_when(method == "R" ~ "Bark",
-                            TRUE ~ "Understory"),
-         tree = case_when(tree == "D" ~ "Deciduous",
-                          TRUE ~ "Coniferous"))
-
-rarefy_df_wide40 <- data.frame(
-  sample = colnames(rarefy_coleop40),
-  coleop_S = rarefy_coleop40[1,],
-  zeale_S = rarefy_zeale40[1,])
-
-# now create a rarified version of the read matrixes for diversity metrics
-
-coleop_rare_mat_rare40 <- rrarefy(select(coleop_rare_mat40,-sample.sum), minreads40)
-
-zeale_rare_mat_rare40 <- rrarefy(select(zeale_rare_mat40,-sample.sum), minreads40)
-
-# Calculate diversity metrics
-coleop_rare_shannon40 <- diversity(coleop_rare_mat_rare40, 
-                               index = "shannon", 
-                               MARGIN = 1, base = exp(1)) %>%
-  as.data.frame() %>%
-  bind_cols(rownames(coleop_rare_mat_rare40),.) %>%
-  rename(sample = 1, shannon = 2) %>%
-  mutate(primer = "16S")
-
-zeale_rare_shannon40 <- diversity(zeale_rare_mat_rare40, 
-                               index = "shannon", 
-                               MARGIN = 1, base = exp(1)) %>%
-  as.data.frame() %>%
-  bind_cols(rownames(coleop_rare_mat_rare40),.) %>%
-  rename(sample = 1, shannon = 2) %>%
-  mutate(primer = "COI")
-
-shannon_df40 <- coleop_rare_shannon40 %>%
-  bind_rows(zeale_rare_shannon40) %>%
-  mutate(method = stringr::str_sub(sample, -1,-1),
-         tree = stringr::str_sub(sample, -2,-2)) %>%
-  mutate(method = case_when(method == "R" ~ "Bark",
-                            TRUE ~ "Understory"),
-         tree = case_when(tree == "D" ~ "Deciduous",
-                          TRUE ~ "Coniferous"))
-
-# Calculate Simpsons index on rarefied data
-coleop_rare_simpson40 <- diversity(coleop_rare_mat_rare40, 
-                               index = "simpson") %>%
-  as.data.frame() %>%
-  bind_cols(rownames(coleop_rare_mat_rare40),.) %>%
-  rename(sample = 1, simpson = 2) %>%
-  mutate(primer = "16S")
-
-zeale_rare_simpson40 <- diversity(zeale_rare_mat_rare40, 
-                               index = "simpson") %>%
-  as.data.frame() %>%
-  bind_cols(rownames(zeale_rare_mat_rare40),.) %>%
-  rename(sample = 1, simpson = 2) %>%
-  mutate(primer = "COI")
-
-simpson_df40 <- coleop_rare_simpson40 %>%
-  bind_rows(zeale_rare_simpson40) %>%
-  mutate(method = stringr::str_sub(sample, -1,-1),
-         tree = stringr::str_sub(sample, -2,-2)) %>%
-  mutate(method = case_when(method == "R" ~ "Bark",
-                            TRUE ~ "Understory"),
-         tree = case_when(tree == "D" ~ "Deciduous",
-                          TRUE ~ "Coniferous"))
-
-# set font size for all plot annotations below
-annfont <- 2
-ytextsize = 10
-xtextsize = 11
-
-# Richness stats
-# rarefy_stats <- rarefy_df_wide %>%
-#   mutate(lc = log(coleop_S),
-#          lz = log(zeale_S)) %>%
-#   summarize(mean_lc = mean(lc),
-#             sd_lc = sd(lc),
-#             n_lc = length(lc),
-#             se_lc = sd_lc/sqrt(n_lc),
-#             lcl_lc = mean_lc - 2*se_lc,
-#             ucl_lc = mean_lc + 2*se_lc,
-#             mean_lz = mean(lz),
-#             sd_lz = sd(lz),
-#             n_lz = length(lz),
-#             se_lz = sd_lz/sqrt(n_lz),
-#             lcl_lz = mean_lz - 2*se_lz,
-#             ucl_lz = mean_lz + 2*se_lz)
-# 
-# exp(rarefy_stats)
-
-# Richness boxplots
-library(wesanderson)
-(rareS.plot <- 
-rarefy_df40 %>%
-  ggplot() + # aes(x = method, y = value)
-  geom_violin(draw_quantiles = .5, aes(x = method, y = S, fill = tree),
-              alpha = 0.6) +
-    facet_wrap(~primer) +
-  geom_point(size = 3, alpha = .75, aes(x = method, y = S, color = tree),
-             position = position_dodge(width = .9)) +  
-    scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
-  scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
-  theme_bw() +
-  theme(legend.background = element_rect(fill = "transparent"),
-        legend.key.size = unit(.35, 'cm'), #change legend key size
-        legend.key.height = unit(.35, 'cm'), #change legend key height
-        legend.key.width = unit(.35, 'cm'), #change legend key width
-        legend.title = element_text(size=10), #change legend title font size
-        legend.text = element_text(size=10)) +
-  theme(text = element_text(size = 14),
-        axis.title.y = element_text(size = ytextsize),
-        axis.text.x = element_text(size = xtextsize),
-        legend.position = c(0.85, 0.81)) +
-  labs(x = "",
-       y = "Rarefied MOTU richness",
-       fill = "",
-       color = "") 
-  )
-  
-  
-summary(lm(log(S) ~ tree + method + primer, data = rarefy_df40))
-  
-# Evenness stats
-# simpson_stats <- simpson_df40 %>%
-#   mutate(lc = coleop_simpson,
-#          lz = zeale_simpson) %>%
-#   summarize(mean_lc = mean(lc),
-#             sd_lc = sd(lc),
-#             n_lc = length(lc),
-#             se_lc = sd_lc/sqrt(n_lc),
-#             lcl_lc = mean_lc - 2*se_lc,
-#             ucl_lc = mean_lc + 2*se_lc,
-#             mean_lz = mean(lz),
-#             sd_lz = sd(lz),
-#             n_lz = length(lz),
-#             se_lz = sd_lz/sqrt(n_lz),
-#             lcl_lz = mean_lz - 2*se_lz,
-#             ucl_lz = mean_lz + 2*se_lz)
-# 
-# simpson_stats
-
-# Evenness boxplots
-(rareSimpson.plot <- 
-simpson_df40 %>%
-  ggplot() + # aes(x = method, y = value)
-  geom_violin(draw_quantiles = .5, aes(x = method, y = simpson, fill = tree),
-              alpha = 0.6) +
-    facet_wrap(~primer) +
-  geom_point(size = 3, alpha = .75, aes(x = method, y = simpson, color = tree),
-             position = position_dodge(width = .9)) +  
-    scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
-  scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.title.y = element_text(size = ytextsize),
-        axis.text.x = element_text(size = xtextsize),
-        legend.position = c(0.85, 0.86)) +
-  labs(x = "",
-       y = "MOTU evenness (Simpson)",
-       fill = "",
-       color = "") +
-    guides(fill = "none", color = "none")
-  )
-
-summary(lm(simpson ~ tree + method + primer, data = simpson_df40))
-
-# Diversity stats
-# shannon_stats <- shannon_df %>%
-#   mutate(lc = coleop_shannon,
-#          lz = zeale_shannon) %>%
-#   summarize(mean_lc = mean(lc),
-#             sd_lc = sd(lc),
-#             n_lc = length(lc),
-#             se_lc = sd_lc/sqrt(n_lc),
-#             lcl_lc = mean_lc - 2*se_lc,
-#             ucl_lc = mean_lc + 2*se_lc,
-#             mean_lz = mean(lz),
-#             sd_lz = sd(lz),
-#             n_lz = length(lz),
-#             se_lz = sd_lz/sqrt(n_lz),
-#             lcl_lz = mean_lz - 2*se_lz,
-#             ucl_lz = mean_lz + 2*se_lz)
-# 
-# shannon_stats
-
-# Diversity boxplots
-(rareShannon.plot <- 
-shannon_df40 %>%
-  ggplot() + # aes(x = method, y = value)
-  geom_violin(draw_quantiles = .5, aes(x = method, y = shannon, fill = tree),
-              alpha = 0.6) +
-    facet_wrap(~primer) +
-  geom_point(size = 3, alpha = .75, aes(x = method, y = shannon, color = tree),
-             position = position_dodge(width = .9)) +  
-    scale_fill_manual(values = wes_palettes$Cavalcanti1[c(2,1)] ) +
-  scale_color_manual(values = wes_palettes$Cavalcanti1[c(2,1)]) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.title.y = element_text(size = ytextsize),
-        axis.text.x = element_text(size = xtextsize),
-        legend.position = c(0.85, 0.86)) +
-  labs(x = "",
-       y = "MOTU diversity (Shannon)",
-       fill = "",
-       color = "") +
-    guides(fill = "none", color = "none")
-  )
-
-summary(lm(shannon ~ tree + method + primer, data = shannon_df40))
-
-library(patchwork)
-
-rareS.plot / rareSimpson.plot / rareShannon.plot
-
-ggsave("figures/rev_FigS1_rarefieddiv_40k.png", width = 5, height = 7, dpi = 400)
-```
 # Examining reference databases
 ```{r}
 
@@ -3645,637 +3195,112 @@ zref <- fread("data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.Z.tsv") %>%
   mutate(len = nchar(sequence))
 
 ```
-# summarize read counts by primer
+
+# Examining negative control samples
 ```{r}
 
-orderreadsC = art_order_reads %>% rowwise() %>% mutate(sumC = sum(c_across(ends_with("coleop")), na.rm = T)) %>% select(order, sumC)
-
-ordersC$pct = ordersC$motus / sum(ordersC$motus)
-ordersZ$pct = ordersZ$motus / sum(ordersZ$motus)
-
-```
-
-
-
-
-
-
-
-
-
-
-
-...old below here...
-
-
-
-
-
-
-
-
-
-
-# Feeding guild - fine scale
-```{r}
-feed_step1 <- diet %>%
-  select(family, diet.cat) %>%
-  left_join(lineage_lookup) %>%
-  right_join(n_otus_max) %>%
-  group_by(diet.cat) %>%
-  # counts number of families with > 0 reads in each sample
-  summarize(across(starts_with("sample"), 
-                   .fns = function(x) sum(x > 0)),
-            .groups = "drop")
-
-feedcats <- feed_step1$diet.cat
-feed <- feed_step1 %>%
-  select(starts_with("sample")) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame() %>%
-  mutate(sample_id = colnames(feed_step1)[2:41],
-         method = str_sub(sample_id, -1,-1),
-         tree = str_sub(sample_id, -2,-2)) %>%
-  group_by(method, tree) %>%
-  # calculates mean number of families in samples of each group
-  summarize(across(contains("V"), mean),
-            .groups = "drop")
-colnames(feed) <- c("method", "tree", feedcats)
-rm(feed_step1, feedcats)
-
-feed_df <- feed %>% 
-  pivot_longer(., cols = "detritophagous/scavenger":"zoophagous-predator") %>%
-  mutate(diet.cat = case_when(name == 
-                                "detritophagous/scavenger" ~ 
-                                "Scavenger",
-                              name == 
-                                "phytophagous-galls/miners" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-multiple/other" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-phyllophagous" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-sap sucking" ~
-                                "Phytophagous",
-                              name == 
-                                "phytophagous-saproxylic" ~
-                                "Phytophagous",
-                              name == 
-                                "zoophagous-parasite/parasitoid" ~
-                                "Parasite/parasitoid",
-                              name == 
-                                "zoophagous-predator" ~
-                                "Predator",
-                              name == 
-                                "multiple categories" ~
-                                "Mulitple categories",
-                              name == 
-                                "mycetophagous" ~
-                                "Mycetophagous",
-                              TRUE ~ name),
-         tree = case_when(tree == "C" ~ "Coniferous",
-                          tree == "D" ~ "Deciduous"),
-         method = case_when(method == "R" ~ "Roller",
-                          method == "S" ~ "Spray"),
-         order = case_when(diet.cat == "Predator" ~ 1,
-                           diet.cat == "Parasite/parasitoid" ~ 2,
-                           diet.cat == "Phytophagous" ~ 3,
-                           diet.cat == "Scavenger" ~ 4,
-                           diet.cat == "Mycetophagous" ~ 5,
-                           diet.cat == "Multiple categories" ~ 6),
-         diet.cat = fct_reorder(diet.cat, order)
-         )
-  
-(feed_plot <- 
-  ggplot(data = feed_df, 
-       aes(x = method, y = value, fill = name)) +
-  theme_bw() +
-  viridis::scale_fill_viridis(discrete=TRUE) +
-  geom_bar(stat="identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent) +
-  facet_wrap(~tree) +
-  labs(y = "% of families", x = "", 
-       fill = "") +
-  ggtitle("Feeding Guild") +
-  theme(axis.text.x = element_text(size = 15),
-        strip.background = element_rect(fill = "white"))
-)
-
-# ggsave("figures/PlotG_feeding_guild_condensed.jpg", 
-#        width = 6, height = 4, dpi = 400)
-
-(feed_plot_condensed <- 
-  ggplot(data = feed_df, 
-       aes(x = method, y = value, fill = diet.cat)) +
-  theme_bw() +
-  viridis::scale_fill_viridis(discrete=TRUE) +
-  geom_bar(stat="identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent) +
-  facet_wrap(~tree) +
-  labs(y = "% of families", x = "", 
-       fill = "") +
-  ggtitle("Feeding Guild") +
-  theme(axis.text.x = element_text(size = 15),
-        strip.background = element_rect(fill = "white"))
-)
-
-# ggsave("figures/PlotH_feeding_guild_condensed.jpg", 
-#        width = 6, height = 4, dpi = 400)
-
-# Habitat / life mode
-life_step1 <- lifemode %>%
-  select(family, life.cat) %>%
-  left_join(lineage_lookup) %>%
-  right_join(n_otus_max) %>%
-  group_by(life.cat) %>%
-  summarize(across(starts_with("sample"), 
-                   .fns = function(x) sum(x > 0)),
-            .groups = "drop")
-
-lifecats <- life_step1$life.cat
-life <- life_step1 %>%
-  select(starts_with("sample")) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame() %>%
-  mutate(sample_id = colnames(life_step1)[2:41],
-         method = str_sub(sample_id, -1,-1),
-         tree = str_sub(sample_id, -2,-2)) %>%
-  group_by(method, tree) %>%
-  summarize(across(contains("V"), mean),
-            .groups = "drop")
-colnames(life) <- c("method", "tree", lifecats)
-rm(life_step1, lifecats)
-
-life_df <- life %>% 
-  pivot_longer(., cols = starts_with("All"):starts_with("Some")) %>%
-  mutate(tree = case_when(tree == "C" ~ "Coniferous",
-                          tree == "D" ~ "Deciduous"),
-         method = case_when(method == "R" ~ "Roller",
-                          method == "S" ~ "Spray"),
-         order = case_when(name == "Fully aquatic" ~ 4,
-                           name == "Fully terrestrial" ~ 1,
-                           name == "All larvae aquatic" ~ 3,
-                           name == "Some larvae aquatic" ~ 2),
-         name = fct_reorder(name, order, .desc = F))
-  
-(life_plot <- 
-  ggplot(data = life_df, 
-       aes(x = method, y = value, fill = name)) +
-  theme_bw() +
-  viridis::scale_fill_viridis(discrete=TRUE) +
-  geom_bar(stat="identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent) +
-  facet_wrap(~tree) +
-  labs(y = "% of families", x = "", 
-       fill = "") +
-  ggtitle("Life mode") +
-  theme(axis.text.x = element_text(size = 15),
-        strip.background = element_rect(fill = "white"))
-)
-
-# ggsave("figures/PlotI_life_mode.jpg",
-#        width = 6, height = 4, dpi = 400)
-
-# Body size
-size_step1 <- size %>%
-  select(family, size.cat = Body_Size, order = Body_Size_order) %>%
-  left_join(lineage_lookup) %>%
-  right_join(n_otus_max) %>%
-  group_by(size.cat) %>%
-  summarize(across(starts_with("sample"), 
-                   .fns = function(x) sum(x > 0)),
-            .groups = "drop")
-
-sizecats <- size_step1$size.cat
-size_step2 <- size_step1 %>%
-  select(starts_with("sample")) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame() %>%
-  mutate(sample_id = colnames(size_step1)[2:41],
-         method = str_sub(sample_id, -1,-1),
-         tree = str_sub(sample_id, -2,-2)) %>%
-  group_by(method, tree) %>%
-  summarize(across(contains("V"), mean),
-            .groups = "drop")
-colnames(size_step2) <- c("method", "tree", sizecats)
-rm(size_step1, sizecats)
-
-size_df <- size_step2 %>% 
-  pivot_longer(., cols = 3:6) %>%
-  mutate(tree = case_when(tree == "C" ~ "Coniferous",
-                          tree == "D" ~ "Deciduous"),
-         method = case_when(method == "R" ~ "Roller",
-                          method == "S" ~ "Spray")) %>%
-  left_join(distinct(select(size, name = Body_Size, 
-                            order = Body_Size_order))) %>%
-  mutate(name = fct_reorder(name, order, .desc = F))
-  
-(size_plot <- 
-  ggplot(data = size_df, 
-       aes(x = method, y = value, fill = name)) +
-  theme_bw() +
-  viridis::scale_fill_viridis(discrete=TRUE) +
-  geom_bar(stat="identity", position = "fill") +
-  scale_y_continuous(labels = scales::percent) +
-  facet_wrap(~tree) +
-  labs(y = "% of families", x = "", 
-       fill = "") +
-  ggtitle("Body size") +
-  theme(axis.text.x = element_text(size = 15),
-        strip.background = element_rect(fill = "white"))
-)
-
-# ggsave("figures/PlotJ_body_size.jpg", 
-#        width = 6, height = 4, dpi = 400)
-
-#################
-##### combine feeding guild, life mode, and body size plots
-#################
-
-feed_plot_condensed / life_plot / size_plot
-
-ggsave("figures/PlotK_guilds_bar.jpg", 
-       width = 6, height = 12, dpi = 400)
-
-```
-# Plots of rarefied species richness, shannon & simpson indexes, relative read frequency by primer
-```{r}
-# MOTU rarefied species richness by sample and primer set
-names(art_order) # to get column numbers of matrix
-data_cols <- 8:44
-coleop_rare_mat <- art_full %>%
-  filter(primer == "coleop") %>%
-  select(data_cols) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame()
-
-zeale_rare_mat <- art_order %>%
-  filter(primer == "zeale") %>%
-  select(data_cols) %>%
-  as.matrix() %>%
-  t() %>%
-  as.data.frame()
-
-apply(coleop_rare_mat, 1, sum)
-sort(apply(coleop_rare_mat, 1, sum))
-apply(zeale_rare_mat, 1, sum)
-sort(apply(zeale_rare_mat, 1, sum))
-
-# get lowest number of reads, excluding the 1 sample with only 195
-minreads <- 3660
-
-rarefy_coleop <- rarefy(coleop_rare_mat[-9,], minreads, se = T)
-rarefy_zeale <- rarefy(zeale_rare_mat[-9,], minreads, se = T)
-
-rarefy_coleop_df <- rarefy_coleop %>%
-  t() %>%
-  as.data.frame() %>%
-  bind_cols(colnames(rarefy_coleop),.) %>%
-  rename(sample = 1) %>%
-  mutate(primer = "Coleop")
-
-rarefy_zeale_df <- rarefy_zeale %>%
-  t() %>%
-  as.data.frame() %>%
-  bind_cols(colnames(rarefy_zeale),.) %>%
-  rename(sample = 1) %>%
-  mutate(primer = "Zeale")
-
-rarefy_df <- rarefy_coleop_df %>%
-  bind_rows(rarefy_zeale_df)
-
-rarefy_df_wide <- data.frame(
-  sample = colnames(rarefy_coleop),
-  coleop_S = rarefy_coleop[1,],
-  zeale_S = rarefy_zeale[1,],
-  coleop_se = rarefy_coleop[2,],
-  zeale_se = rarefy_zeale[2,])
-
-# now create a rarified version of the read matrixes for diversity metrics
-
-coleop_rare_mat_rare <- rrarefy(coleop_rare_mat[-9,], minreads)
-zeale_rare_mat_rare <- rrarefy(zeale_rare_mat[-9,], minreads)
-
-# Calculate diversity metrics
-coleop_rare_shannon <- diversity(coleop_rare_mat[-9,], 
-                               index = "shannon", 
-                               MARGIN = 1, base = exp(1)) %>%
-  as.data.frame() %>%
-  bind_cols(rownames(coleop_rare_mat[-9,]),.) %>%
-  rename(sample = 1, coleop_shannon = 2)
-
-zeale_rare_shannon <- diversity(zeale_rare_mat[-9,], 
-                               index = "shannon", 
-                               MARGIN = 1, base = exp(1)) %>%
-  as.data.frame() %>%
-  bind_cols(rownames(coleop_rare_mat[-9,]),.) %>%
-  rename(sample = 1, zeale_shannon = 2)
-
-shannon_df <- coleop_rare_shannon %>%
-  bind_cols(select(zeale_rare_shannon, -sample))
-
-# Calculate Simpsons index on rarefied data
-coleop_rare_simpson <- diversity(coleop_rare_mat[-9,], 
-                               index = "simpson") %>%
-  as.data.frame() %>%
-  bind_cols(rownames(coleop_rare_mat[-9,]),.) %>%
-  rename(sample = 1, coleop_simpson = 2)
-
-zeale_rare_simpson <- diversity(zeale_rare_mat[-9,], 
-                               index = "simpson") %>%
-  as.data.frame() %>%
-  bind_cols(rownames(zeale_rare_mat[-9,]),.) %>%
-  rename(sample = 1, zeale_simpson = 2)
-
-simpson_df <- coleop_rare_simpson %>%
-  bind_cols(select(zeale_rare_simpson, -sample))
-
-# set font size for all plot annotations below
-annfont <- 2
-ytextsize = 10
-xtextsize = 11
-
-# Richness boxplots
-rarefy_stats <- rarefy_df_wide %>%
-  mutate(lc = log(coleop_S),
-         lz = log(zeale_S)) %>%
-  summarize(mean_lc = mean(lc),
-            sd_lc = sd(lc),
-            n_lc = length(lc),
-            se_lc = sd_lc/sqrt(n_lc),
-            lcl_lc = mean_lc - 2*se_lc,
-            ucl_lc = mean_lc + 2*se_lc,
-            mean_lz = mean(lz),
-            sd_lz = sd(lz),
-            n_lz = length(lz),
-            se_lz = sd_lz/sqrt(n_lz),
-            lcl_lz = mean_lz - 2*se_lz,
-            ucl_lz = mean_lz + 2*se_lz)
-
-exp(rarefy_stats)
-
-(rareS.plot <- 
-rarefy_df_wide %>%
-  select(-ends_with("_se")) %>%
-  tidyr::pivot_longer(cols = ends_with("_S")) %>%
-  mutate(name = case_when(name == "coleop_S" ~ "Coleop",
-                          name == "zeale_S" ~ "Zeale")) %>%
-  ggplot(aes(x = name, y = value)) +
-  geom_line(size = .5, alpha = .5, 
-            aes(group = sample), 
-            color = "darkgray") +
-  geom_violin(draw_quantiles = .5, aes(fill = name),
-              alpha = 0.6) +
-  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
-  scale_color_manual(values = wes_palette("Cavalcanti1")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.title.y = element_text(size = ytextsize),
-        axis.text.x = element_text(size = xtextsize)) +
-  labs(x = "",
-       y = "Rarefied MOTU richness") +
-  guides(fill = "none", color = "none") +
-  annotate("text", x = 2.5, y = 160, 
-           label = paste0("Means (log-normal)",
-           "\nColeop: ",
-           round(exp(rarefy_stats$mean_lc),1), 
-           ", 95% CI = [",
-           round(exp(rarefy_stats$lcl_lc),1),
-           ", ",
-           round(exp(rarefy_stats$ucl_lc),1), 
-           "]\n",
-           "Zeale: ",
-           round(exp(rarefy_stats$mean_lz),1),
-           ", 95% CI = [",
-           round(exp(rarefy_stats$lcl_lz),1),
-           ", ",
-           round(exp(rarefy_stats$ucl_lz),1),
-           "]"),
-           hjust = 1,
-           size = annfont,
-           color = "darkgray")
-)
-  
-# Evenness boxplots
-simpson_stats <- simpson_df %>%
-  mutate(lc = coleop_simpson,
-         lz = zeale_simpson) %>%
-  summarize(mean_lc = mean(lc),
-            sd_lc = sd(lc),
-            n_lc = length(lc),
-            se_lc = sd_lc/sqrt(n_lc),
-            lcl_lc = mean_lc - 2*se_lc,
-            ucl_lc = mean_lc + 2*se_lc,
-            mean_lz = mean(lz),
-            sd_lz = sd(lz),
-            n_lz = length(lz),
-            se_lz = sd_lz/sqrt(n_lz),
-            lcl_lz = mean_lz - 2*se_lz,
-            ucl_lz = mean_lz + 2*se_lz)
-
-simpson_stats
-
-(simpson.plot <- 
-simpson_df %>%
-  tidyr::pivot_longer(cols = ends_with("_simpson")) %>%
-  mutate(name = case_when(name == "coleop_simpson" ~ "Coleop",
-                          name == "zeale_simpson" ~ "Zeale")) %>%
-  ggplot(aes(x = name, y = value)) +
-  geom_line(size = .5, alpha = .5, 
-            aes(group = sample), 
-            color = "darkgray") +
-  geom_violin(draw_quantiles = .5, aes(fill = name),
-              alpha = 0.6) +
-  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
-  scale_color_manual(values = wes_palette("Cavalcanti1")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.title.y = element_text(size = ytextsize),
-        axis.text.x = element_text(size = xtextsize)) +
-  labs(x = "",
-       y = "MOTU evenness (Simpson)") +
-  guides(fill = "none", color = "none") +
-  annotate("text", x = 2.5, y = 1.3,
-           label = paste0("Means",
-           "\nColeop: ",
-           round(simpson_stats$mean_lc,2),
-           ", 95% CI = [",
-           round(simpson_stats$lcl_lc,2),
-           ", ",
-           round(simpson_stats$ucl_lc,2),
-           "]\n",
-           "Zeale: ",
-           round(simpson_stats$mean_lz,2),
-           ", 95% CI = [",
-           round(simpson_stats$lcl_lz,2),
-           ", ",
-           round(simpson_stats$ucl_lz,2),
-           "]"),
-           hjust = 1,
-           vjust = 1,
-           size = annfont,
-           color = "darkgray")
-)
-  
-# Diversity boxplots
-shannon_stats <- shannon_df %>%
-  mutate(lc = coleop_shannon,
-         lz = zeale_shannon) %>%
-  summarize(mean_lc = mean(lc),
-            sd_lc = sd(lc),
-            n_lc = length(lc),
-            se_lc = sd_lc/sqrt(n_lc),
-            lcl_lc = mean_lc - 2*se_lc,
-            ucl_lc = mean_lc + 2*se_lc,
-            mean_lz = mean(lz),
-            sd_lz = sd(lz),
-            n_lz = length(lz),
-            se_lz = sd_lz/sqrt(n_lz),
-            lcl_lz = mean_lz - 2*se_lz,
-            ucl_lz = mean_lz + 2*se_lz)
-
-shannon_stats
-
-(shannon.plot <- 
-shannon_df %>%
-  tidyr::pivot_longer(cols = ends_with("_shannon")) %>%
-  mutate(name = case_when(name == "coleop_shannon" ~ "Coleop",
-                          name == "zeale_shannon" ~ "Zeale")) %>%
-  ggplot(aes(x = name, y = value)) +
-  geom_line(size = .5, alpha = .5, 
-            aes(group = sample), 
-            color = "darkgray") +
-  geom_violin(draw_quantiles = .5, aes(fill = name),
-              alpha = 0.6) +
-  geom_point(size = 4, alpha = .5, aes(color = name)) +  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
-  scale_color_manual(values = wes_palette("Cavalcanti1")) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.title.y = element_text(size = ytextsize),
-        axis.text.x = element_text(size = xtextsize)) +
-  labs(x = "",
-       y = "MOTU diversity (Shannon)") +
-  guides(fill = "none", color = "none") +
-  annotate("text", x = 2.5, y = 4.8,
-           label = paste0("Means",
-           "\nColeop: ",
-           round(shannon_stats$mean_lc,2),
-           ", 95% CI = [",
-           round(shannon_stats$lcl_lc,2),
-           ", ",
-           round(shannon_stats$ucl_lc,2),
-           "]\n",
-           "Zeale: ",
-           round(shannon_stats$mean_lz,2),
-           ", 95% CI = [",
-           round(shannon_stats$lcl_lz,2),
-           ", ",
-           round(shannon_stats$ucl_lz,2),
-           "]"),
-           hjust = 1,
-           vjust = 1,
-           size = annfont,
-           color = "darkgray")
-)
-
-#################
-#### Plotting relative read abundance by order (bar chart)
-#################
-
-# set up plotting order df
-order_df <- data.frame(cat = unique(paste0(art_full$class, "-", 
-                                      art_full$order)),
-           order = c(2,4,1,3,6,15,9,7,10,12,8,23,
-                     14,13,11,22,16,24,5,20,19,17,21,18),
-           name = c("Spiders",
-                    "Unknown Arachnids",
-                    "Sarcoptiform mites",
-                    "Trombidiform mites",
-                    "Collembola",
-                    "Cockroaches",
-                    "Beetles",
-                    "Flies",
-                    "True bugs",
-                    "Bees, wasps, & ants",
-                    "Butterflies & moths",
-                    "Unknown insects",
-                    "Lacewings",
-                    "Crickets & grasshoppers",
-                    "Bark lice",
-                    "Fleas",
-                    "Caddisflies",
-                    "Unknown arthropods",
-                    "Centipedes",
-                    "Mayflies",
-                    "Mantids",
-                    "Dragonflies & damselflies",
-                    "Walking sticks",
-                    "Thrips"))
-                    
-
-names(art_full)
-primer_who <- art_full %>%
-  mutate(cat = paste0(class, "-", order)) %>%
-  select(primer, cat) %>%
-  bind_cols(total.reads = rowSums(art_full[,8:44])) %>%
-  group_by(primer, cat) %>%
-  summarize(total.reads = sum(total.reads),
-            .groups = "drop") %>%
-  group_by(primer) %>%
-  mutate(rel.reads = 100*total.reads / sum(total.reads)) %>%
+### Coleop
+
+cn3 <- read.csv("data/pinebugs.negatives.onlyarth.C.csv") %>%
+  filter(negsum != 0) %>% 
+  left_join(select(cs3, id, sampsum))
+
+cs_nn <- read.csv("data/pinebugs.samples.step0.nofilters.swarm1.C.csv") %>%
+  filter(phylum == "Arthropoda") %>%
+  rowwise() %>%
+  mutate(sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
   ungroup() %>%
-  # this part adds primer-taxa categories that had no reads
-  right_join(expand.grid(cat = unique(paste0(art_full$class, "-", 
-                                      art_full$order)),
-                         primer = c("coleop", "zeale"))) %>%
-  # this part converts the NAs in the previous step to 0's
-  mutate(rel.reads = tidyr::replace_na(rel.reads, 0),
-         primer = case_when(primer == "coleop" ~ "Coleop",
-                            primer == "zeale" ~ "Zeale")) %>%
-  group_by(cat) %>%
-  mutate(mean_rel.reads = mean(rel.reads)) %>%
+  filter(sum > 0)
+
+nrow(cn3) # 18 MOTUs in negatives
+
+sum(cn3$negsum) # 3402 reads
+
+cn3[cn3$id %in% cs_nn$id,]$id # 10 of which were also present in samples
+
+sum(cn3[cn3$id %in% cs_nn$id,]$negsum) # 1696 reads
+
+cn3[cn3$id %in% cs3$id,]$id # 8 of which were also present in samples after negative subtraction
+
+sum(cn3[cn3$id %in% cs3$id,]$negsum) # 1374 reads
+
+sum(cs3[cs3$id %in% cn3$id,]$sampsum) # 18344 reads
+
+cs3[cs3$id %in% cn3$id,]$finalID # 
+
+### Zeale
+
+zn3 <- read.csv("data/pinebugs.negatives.onlyarth.Z.csv") %>%
+  filter(negsum != 0) %>% 
+  left_join(select(cs3, id, sampsum))
+
+zs_nn <- read.csv("data/pinebugs.samples.step0.nofilters.swarm1.Z.csv") %>%
+  filter(phylum == "Arthropoda") %>%
+  rowwise() %>%
+  mutate(sum = sum(c_across(starts_with("sample")), na.rm = T)) %>%
   ungroup() %>%
-  left_join(order_df) %>%
-  mutate(name = forcats::fct_reorder(name, order, .desc = T))
+  filter(sum > 0)
 
-(who_plot <- 
-primer_who %>%
-  ggplot() +
-  geom_col(aes(y = name, x = sqrt(rel.reads),
-               fill = primer),
-           position = position_dodge(),
-           alpha = 0.6) +
-  scale_fill_manual(values = wes_palette("Cavalcanti1")) +
-  scale_color_manual(values = wes_palette("Cavalcanti1")) +
-  scale_x_continuous(breaks = c(0,2,4,6),
-                     labels = c(0,4,16,36)) +
-  theme_bw() +
-  theme(text = element_text(size = 14),
-        axis.text.y = element_text(size = 10),
-        legend.position = c(.7,.1)) +
-  labs(x = "% of total reads",
-       y = "",
-       fill = "")# +
-  # geom_text(aes(y = name, x = rel.reads + 1.5, 
-  #               color = primer, 
-  #               label = round(rel.reads,2)),
-  #           position = position_dodge(width = 1),
-  #           size = 1.5,
-  #           data = filter(primer_who, rel.reads < 1))
-)
+nrow(zn3) # 6 MOTUs in negatives
 
-# Stitch together primer plots
-patchobj <- who_plot | (rareS.plot / simpson.plot / shannon.plot)
+sum(zn3$negsum) # 997 reads
 
-ggsave("figures/primer_compare6.png", width = 7, height = 7, dpi = 400)
+zn3[cn3$id %in% zs_nn$id,]$id # 0 of which were also present in samples
+
+sum(cn3[cn3$id %in% cs_nn$id,]$negsum) # 1696 reads
+
+cn3[cn3$id %in% cs3$id,]$id # 8 of which were also present in samples after negative subtraction
+
+sum(cn3[cn3$id %in% cs3$id,]$negsum) # 1374 reads
+
 
 ```
 
+# random calculations for the results and discussion
+```{r}
+
+# how many carabids in COI samples
+sum(apply(select(art_full[!is.na(art_full$family) & art_full$family=="Carabidae",], contains(c("CS", "CR", "DS", "DR"))), 2, sum)>0)
+# 31
+
+# out of
+length(apply(select(art_full, contains(c("CS", "CR", "DS", "DR"))), 2, sum)>0)
+# 37
+
+# how many mammals
+c_mam <- read.csv("data/pinebugs.samples.step2.negsub.swarm1.C.csv") %>%
+  filter(phylum == "Chordata")
+dput(sort(unique(c_mam$species)))
+dput(sort(unique(c_mam$genus)))
+
+mamlist <- c("Blarina brevicauda", "Canis lupus", "Didelphis virginiana", 
+"Eptesicus fuscus", "Felis catus", "Glaucomys volans", "Lasiurus borealis", 
+"Mephitis mephitis", "Odocoileus virginianus", "Peromyscus leucopus", 
+"Procyon lotor", "Rattus norvegicus", "Sciurus carolinensis", 
+"Sylvilagus floridanus", "Tamias striatus", "Vulpes vulpes"
+)
+length(mamlist)
+
+mamgen <- c("Blarina", "Canis", "Didelphis", "Eptesicus", 
+"Felis", "Glaucomys", "Lasiurus", "Mephitis", "Odocoileus", 
+"Peromyscus", "Procyon", "Rattus", "Sciurus", 
+"Sylvilagus", "Tamias", "Vulpes")
+
+# mammal families
+c_mam %>% filter(species %in% mamlist) %>% select(family) %>% distinct()
+
+# count mammal reads
+c_mam %>% filter((genus %in% mamgen) | (family == "Sciuridae")) %>% select(count) %>% sum()
+
+# how many MOTUs not identified to species
+(cs3 %>% filter(!is.na(species)) %>% tally())
+nrow(cs3)
+112/1025 # 0.1093
+
+(zs3 %>% filter(!is.na(species)) %>% tally())
+nrow(zs3)
+227/645 # 0.3519
+
+
+```
 
