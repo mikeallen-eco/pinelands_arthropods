@@ -261,7 +261,7 @@ art_gen_motus <- art_full %>%
   select(genus, ends_with("coleop"), ends_with("zeale"))
 
 art_sp_reads <- art_full %>%
-  filter(species != "NA" & is.na(species)==F) %>% # this part fixes 2 typos in sci
+  filter(species != "NA" & is.na(species)==F) %>% 
   group_by(primer, species) %>%
   summarise(across(starts_with("sample"), sum),
             .groups = "drop") %>%
@@ -277,7 +277,7 @@ sprayZ_motu_mat <- art_motu_reads %>%
   filter(grepl(id, pattern = "Z")) %>%
   select(contains("CS"), contains("DS")) %>%
   select(contains("zeale")) %>%
-  select(-sample.3CS_zeale) %>% # a sample with no sample for the Zeale primer
+  select(-sample.3CS_zeale) %>% # a sample with no reads for the Zeale primer
   t()
 sprayZ_motu_mat[is.na(sprayZ_motu_mat)] <- 0 
 sprayZ_motu_mat[sprayZ_motu_mat>0] <- 1 
@@ -568,12 +568,6 @@ roll_fam_mat[roll_fam_mat>0] <- 1
 # pooled spray samples - family level
 spray_fam_mat <- sprayC_fam_mat2 + sprayZ_fam_mat2
 spray_fam_mat[spray_fam_mat>0] <- 1
-
-# counting families
-genct <- art_gen_reads %>% 
-  select(genus, sample.sum_coleop, sample.sum_zeale) %>%
-  filter(!(is.na(sample.sum_coleop) & is.na(sample.sum_zeale))) %>%
-  filter(!((sample.sum_coleop == 0) & (sample.sum_zeale == 0)))
 
 # read counts by unique taxon
 readsC = cs3 %>% group_by(phylum, class, order, family, genus, species) %>% summarize(count = sum(count))
@@ -3182,7 +3176,84 @@ plot(gg)
 ggsave(plot = gg, filename = "figures/rev_FigS1_rarediversity_swarm1_1.png", 
        height = 9, width = 4, dpi = 400)
 ```
+# Table S3: total reads by order, family, genus, species, and sample method
+```{r}
+# get family common names
+# common_fam <- taxize::sci2comm(sort(unique(art_full$family)))
+# commons_df <- common_fam %>%
+#   do.call(rbind, .) %>%
+#   as.data.frame() %>%
+#   rename(common_fam = 1) %>%
+#   arrange(common_fam)
+# commons_df$family <- rownames(commons_df)
+write.csv(commons_df, "data/family_commons.csv", row.names = F)
+(commons_df <- read.csv("data/family_commons.csv"))
 
+# format
+master <- art_full  %>%
+  mutate(engname = case_when(order == "Mesostigmata" ~ "Mites",
+                          order == "Sarcoptiformes" ~ "Mites",
+                          order == "Trombidiformes" ~ "Mites",
+                          class == "Collembola" ~ "Springtails",
+                          class == "Chilopoda" ~ "Centipedes",
+                          order == "Araneae" ~ "Spiders",
+                          order == "Opiliones" ~ "Harvestmen",
+                          order == "Blattodea" ~ "Cockroaches",
+                          order == "Coleoptera" ~ "Beetles",
+                          order == "Dermaptera" ~ "Earwigs",
+                          order == "Diptera" ~ "Flies",
+                          order == "Ephemeroptera" ~ "Mayflies",
+                          order == "Hemiptera" ~ "True bugs",
+                          order == "Hymenoptera" ~ "Bees, wasps, & ants",
+                          order == "Lepidoptera" ~ "Butterflies & moths",
+                          order == "Mantodea" ~ "Mantids",
+                          order == "Megaloptera" ~ "Dobsonflies",
+                          order == "Cyclopoida" ~ "Copepods",
+                          order == "Neuroptera" ~ "Lacewings",
+                          order == "Odonata" ~ "Dragonflies & damselflies",
+                          order == "Orthoptera" ~ "Crickets & grasshoppers",
+                          order == "Phasmatodea" ~ "Walking sticks",
+                          order == "Phthiraptera" ~ "Thrips",
+                          order == "Psocoptera" ~ "Bark lice",
+                          order == "Siphonaptera" ~ "Fleas",
+                          order == "Trichoptera" ~ "Caddisflies",
+                          (is.na(order) & is.na(class) & phylum == "Arthropoda") ~ "Arthropod sp.",
+                          (is.na(order) & !is.na(class) ~ paste0(class, " sp."))
+                          )) %>%
+  mutate(lowestname = case_when(!is.na(species) ~ species,
+                           !is.na(genus) & is.na(species) ~ paste0(genus, " sp."),
+                           is.na(genus) ~ NA)) %>%
+  left_join(commons_df) # add common family name
+
+# format data for spray samples
+orderreads_S3 <- master %>%
+  group_by(engname, phylum, class, order, family, genus, species, lowestname, common_fam, primer) %>%
+  summarize(across(contains(c("CS", "DS", "CR", "DR")), sum),
+            .groups = "drop") %>%
+  rowwise() %>% 
+  mutate(sum = sum(c_across(contains(c("CS", "DS", "CR", "DR"))), na.rm = T)) %>%
+  ungroup() %>%
+  mutate(order2 = case_when(!is.na(order) ~ paste0(order, " (", engname, ")"),
+                            TRUE ~ NA),
+         family2 = case_when(!is.na(family) & !is.na(common_fam) ~ paste0(family, " (", common_fam, ")"),
+                             !is.na(family) & is.na(common_fam) ~ family,
+                             TRUE ~ NA)) %>%
+  select(class, order2, family2, lowestname, primer, sum) %>%
+  arrange(class, order2, family2, lowestname) %>%
+  pivot_wider(id_cols = class:lowestname, names_from = primer, values_from = sum) %>%
+  replace_na(list(zeale = 0, coleop = 0)) %>%
+  # mutate(class = "") %>%
+  rename(Class = class, Order = order2, Family = family2, Species = lowestname, primerCOI = zeale, primer16S = coleop)
+  
+library(knitr)
+library(kableExtra)
+library(magrittr)
+
+kable(orderreads_S3, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  cat(., file = "figures/tableS3_reads_tally_species.html")
+
+```
 # Examining reference databases
 ```{r}
 
@@ -3302,5 +3373,51 @@ nrow(zs3)
 227/645 # 0.3519
 
 
+```
+
+# read-based rarefaction curves
+```{r}
+
+library(iNEXT)
+
+# Format data
+
+# create accumulation curves
+
+# run accumulation curve analyses in iNEXT
+accum.motu.reads.Z <- iNEXT(
+  as.data.frame(select(filter(art_motu_reads, grepl(id, pattern = "Z")), !contains(c("id", "coleop", "sum", "3CS")))), 
+                            q=0, datatype="abundance", endpoint = 60000, knots = 100)
+saveRDS(accum.motu.reads.Z, "output/accum.motu.reads.Z.rds")
+
+Z.df <- accum.motu.reads.Z$iNextEst$coverage_based
+saveRDS(Z.df, "output/accum.motu.reads.Z.df.rds")
+
+# run accumulation curve analyses in iNEXT
+accum.motu.reads.C <- iNEXT(
+  as.data.frame(select(filter(art_motu_reads, grepl(id, pattern = "C")), !contains(c("id", "zeale", "sum")))), 
+                            q=0, datatype="abundance", endpoint = 60000, knots = 100)
+saveRDS(accum.motu.reads.C, "output/accum.motu.reads.C.rds")
+
+C.df <- accum.motu.reads.C$iNextEst$coverage_based
+saveRDS(C.df, "output/accum.motu.reads.C.df.rds")
+
+# make plots 
+
+Z.df %>%
+  filter(Method %in% c("Rarefaction", "Observed")) %>%
+ggplot() +
+  geom_line(aes(x = m, y = qD, color = Assemblage)) +
+  geom_line(aes(x = m, y = qD, color = Assemblage), data = filter(Z.df, Method == "Extrapolation"), lty = 3) +
+  guides(color = "none") +
+  scale_x_continuous(limits = c(0,50000))
+
+C.df %>%
+  filter(Method %in% c("Rarefaction", "Observed")) %>%
+ggplot() +
+  geom_line(aes(x = m, y = qD, color = Assemblage)) +
+  geom_line(aes(x = m, y = qD, color = Assemblage), data = filter(C.df, Method == "Extrapolation"), lty = 3) +
+  guides(color = "none") +
+  scale_x_continuous(limits = c(0,50000))
 ```
 

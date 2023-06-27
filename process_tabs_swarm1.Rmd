@@ -848,3 +848,153 @@ cs3 %>% filter(!is.na(order),
   distinct()
 
 ```
+
+
+# counting reads for supplemental table S1
+```{r}
+
+### Zeale
+
+# Zeale step 1: how many reads after filtering steps performed on cluster
+
+step1 <- z0 %>%
+  left_join(zc, by = join_by(id, definition, sequence))
+
+# check which columns are negatives
+colnames(step1) # input those column numbers in the next line
+negatives <- c(16,17,25,55:57)
+colnames(as.data.frame(step1)[, negatives])
+
+# select out just the samples
+step1.s <- step1 %>%
+  select(-all_of(negatives))
+
+# tally up read stats for samples
+sum(apply(select(step1.s, starts_with("sample")), 2, sum)) # 4538107
+mean(apply(select(step1.s, starts_with("sample")), 2, sum)) # 126058.5
+sd(apply(select(step1.s, starts_with("sample")), 2, sum)) # 38706.53
+length(apply(select(step1.s, starts_with("sample")), 2, sum)) # 36
+38706.53 / sqrt(36) # 6451
+
+# select out just the negatives
+step1.n <- step1 %>%
+  select(id, all_of(negatives), sequence)
+
+# tally up read stats for negatives
+sum(apply(select(step1.n, starts_with("sample")), 2, sum)) # 1248
+mean(apply(select(step1.n, starts_with("sample")), 2, sum)) # 208
+sd(apply(select(step1.n, starts_with("sample")), 2, sum)) # 418.8
+length(apply(select(step1.n, starts_with("sample")), 2, sum)) # 6
+418.8 / sqrt(6) # 6451
+
+# Zeale step 2: remove human and mouse 
+
+step2.s <- step1.s %>%
+  left_join(select(zs, id:species)) %>%
+  select(id, match, finalID:species, starts_with("sample")) %>%
+  filter(species %notin% c("Homo sapiens", "Mus musculus")) # no mice or humans in COI primer
+
+
+# Zeale step 3: subtract negatives, remove rest of non-arthropods, and match < 0.8
+  # this is same as zs3 from above
+step3.s <- zs3
+
+# tally up read stats for samples
+sum(apply(select(step3.s, starts_with("sample")), 2, sum)) # 4116475
+mean(apply(select(step3.s, starts_with("sample")), 2, sum)) # 114346.5
+sd(apply(select(step3.s, starts_with("sample")), 2, sum)) # 38731.1
+length(apply(select(step3.s, starts_with("sample")), 2, sum)) # 36
+38731.1 / sqrt(36) # 6455.183
+
+step3.n <- zn3
+
+# tally up read stats for samples
+sum(apply(select(step3.n, starts_with("sample")), 2, sum)) # 997
+mean(apply(select(step3.n, starts_with("sample")), 2, sum)) # 166.1667
+sd(apply(select(step3.n, starts_with("sample")), 2, sum)) # 337.9073
+length(apply(select(step3.n, starts_with("sample")), 2, sum)) # 36
+337.9073/sqrt(6) # 137.9501
+
+
+### Coleop
+
+# Coleop step 1: how many reads after filtering steps performed on cluster
+
+step1 <- c0 %>%
+  left_join(select(c2, id, definition, sequence, starts_with("sample")), by = join_by(id, definition, sequence))
+
+# check which columns are negatives
+colnames(step1) # input those column numbers in the next line
+negatives.C <- c(15,16,24,25,56:68)
+colnames(as.data.frame(step1)[, negatives.C])
+
+# select out just the samples
+step1.s <- step1 %>%
+  select(-all_of(negatives.C))
+
+# tally up read stats for samples
+sum(apply(select(step1.s, starts_with("sample")), 2, sum, na.rm = T)) # 2668687
+mean(apply(select(step1.s, starts_with("sample")), 2, sum, na.rm = T)) # 72126.68
+sd(apply(select(step1.s, starts_with("sample")), 2, sum, na.rm = T)) # 31761.21
+length(apply(select(step1.s, starts_with("sample")), 2, sum)) # 37
+31761.21 / sqrt(37) # 5221.511
+
+# select out just the negatives
+step1.n <- step1 %>%
+  select(id, all_of(negatives.C), sequence)
+
+# tally up read stats for negatives
+sum(apply(select(step1.n, starts_with("sample")), 2, sum)) # 60072
+mean(apply(select(step1.n, starts_with("sample")), 2, sum)) # 3533.647
+sd(apply(select(step1.n, starts_with("sample")), 2, sum)) # 8229.316
+length(apply(select(step1.n, starts_with("sample")), 2, sum)) # 17
+8229.316 / sqrt(17) # 1995.902
+
+# Coleop step 2: remove human and mouse 
+
+step2.s <- step1.s %>%
+  left_join(select(cs, id:species)) %>%
+  select(id, match, finalID:species, starts_with("sample")) %>%
+  filter(species %notin% c("Homo sapiens", "Mus musculus")) # no mice or humans in COI primer
+
+# tally up read stats for samples
+sum(apply(select(step2.s, starts_with("sample")), 2, sum)) # 2611101
+mean(apply(select(step2.s, starts_with("sample")), 2, sum, na.rm = T)) # 70570.3
+sd(apply(select(step2.s, starts_with("sample")), 2, sum, na.rm = T)) # 30645.44
+length(apply(select(step2.s, starts_with("sample")), 2, sum)) # 37
+30645.44 / sqrt(37) # 5038.079
+
+step2.n <- step1.n %>%
+  left_join(select(cs, id:species)) %>%
+  select(id, finalID:species, starts_with("sample")) %>%
+  filter(species %notin% c("Homo sapiens", "Mus musculus")) # no mice or humans in COI primer
+
+# tally up read stats for samples
+sum(apply(select(step2.n, starts_with("sample")), 2, sum)) # 6413
+mean(apply(select(step2.n, starts_with("sample")), 2, sum, na.rm = T)) # 377.2353
+sd(apply(select(step2.n, starts_with("sample")), 2, sum, na.rm = T)) # 986.0064
+length(apply(select(step2.n, starts_with("sample")), 2, sum)) # 17
+986.0064 / sqrt(17) # 239.1417
+# note: 44146 human reads; 9513 mouse reads
+
+# Coleop step 3: subtract negatives, remove rest of non-arthropods, and match < 0.8
+  # this is same as zs3 from above
+step3.s <- cs3
+
+# tally up read stats for samples
+sum(apply(select(step3.s, starts_with("sample")), 2, sum)) # 2068121
+mean(apply(select(step3.s, starts_with("sample")), 2, sum)) # 55895.16
+sd(apply(select(step3.s, starts_with("sample")), 2, sum)) # 32712.56
+length(apply(select(step3.s, starts_with("sample")), 2, sum)) # 37
+32712.56 / sqrt(37) # 5377.912
+
+step3.n <- cn3
+
+# tally up read stats for samples
+sum(apply(select(step3.n, starts_with("sample")), 2, sum)) # 3402
+mean(apply(select(step3.n, starts_with("sample")), 2, sum)) # 200
+sd(apply(select(step3.n, starts_with("sample")), 2, sum)) # 658.4878
+length(apply(select(step3.n, starts_with("sample")), 2, sum)) # 17
+658.4878/sqrt(17) # 159.7068
+```
+
