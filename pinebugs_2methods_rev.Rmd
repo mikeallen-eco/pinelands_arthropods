@@ -3326,23 +3326,15 @@ sum(cn3[cn3$id %in% cs3$id,]$negsum) # 1374 reads
 
 
 ```
-
-# random calculations for the results and discussion
+# Table S4. Mammals identified using the 16S primer set
 ```{r}
-
-# how many carabids in COI samples
-sum(apply(select(art_full[!is.na(art_full$family) & art_full$family=="Carabidae",], contains(c("CS", "CR", "DS", "DR"))), 2, sum)>0)
-# 31
-
-# out of
-length(apply(select(art_full, contains(c("CS", "CR", "DS", "DR"))), 2, sum)>0)
-# 37
 
 # how many mammals
 c_mam <- read.csv("data/pinebugs.samples.step2.negsub.swarm1.C.csv") %>%
   filter(phylum == "Chordata")
 dput(sort(unique(c_mam$species)))
 dput(sort(unique(c_mam$genus)))
+dput(sort(unique(c_mam$family)))
 
 mamlist <- c("Blarina brevicauda", "Canis lupus", "Didelphis virginiana", 
 "Eptesicus fuscus", "Felis catus", "Glaucomys volans", "Lasiurus borealis", 
@@ -3363,6 +3355,160 @@ c_mam %>% filter(species %in% mamlist) %>% select(family) %>% distinct()
 # count mammal reads
 c_mam %>% filter((genus %in% mamgen) | (family == "Sciuridae")) %>% select(count) %>% sum()
 
+# make mammal table
+mamcom <- taxize::sci2comm(mamlist) %>%
+  do.call(rbind, .)
+
+# count reads by species
+mamsp.reads <- c_mam %>%
+  # compute sum for bark samples
+  rowwise() %>%
+  mutate(barksum = sum(c_across(contains(c("DR", "CR"))))) %>%
+  ungroup() %>%
+  # now for understory samples
+  rowwise() %>%
+  mutate(leafsum = sum(c_across(contains(c("DS", "CS"))))) %>%
+  ungroup() %>%
+  filter(species %in% mamlist) %>% 
+  group_by(order, species) %>%
+  summarize(Bark = sum(barksum),
+            Understory = sum(leafsum),
+            .groups = "drop")
+
+mamtab <- data.frame(
+  name = mamcom[,1],
+  species = mamlist
+) %>%
+  left_join(mamsp.reads) %>%
+  mutate(label = paste0(name, " (", species, ")")) %>%
+  select(order, label, Bark, Understory) %>%
+  arrange(order, label)
+
+library(knitr)
+library(kableExtra)
+library(magrittr)
+
+kable(mamtab, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  cat(., file = "figures/tableS4_mammal_read_tally.html")
+
+```
+# Figure S1. read-based rarefaction curves
+```{r}
+
+library(iNEXT)
+
+# Format data
+
+# create accumulation curves
+
+### Motu level
+
+### Zeale
+
+# run accumulation curve analyses in iNEXT
+# accum.motu.reads.Z <- iNEXT(
+#   as.data.frame(select(filter(art_motu_reads, grepl(id, pattern = "Z")), !contains(c("id", "coleop", "sum", "3CS")))), 
+#                             q=0, datatype="abundance", endpoint = 60000, knots = 100)
+# saveRDS(accum.motu.reads.Z, "output/accum.motu.reads.Z.rds")
+accum.motu.reads.Z <- readRDS("output/accum.motu.reads.Z.rds")
+  
+Z.df <- accum.motu.reads.Z$iNextEst$coverage_based
+
+### Coleop
+
+# run accumulation curve analyses in iNEXT
+# accum.motu.reads.C <- iNEXT(
+#   as.data.frame(select(filter(art_motu_reads, grepl(id, pattern = "C")), !contains(c("id", "zeale", "sum")))), 
+#                             q=0, datatype="abundance", endpoint = 60000, knots = 100)
+# saveRDS(accum.motu.reads.C, "output/accum.motu.reads.C.rds")
+accum.motu.reads.C <- readRDS("output/accum.motu.reads.C.rds")
+
+C.df <- accum.motu.reads.C$iNextEst$coverage_based
+
+### species level
+
+### Zeale 
+
+sp.rare.Z <- as.data.frame(select(art_sp_reads, !contains(c("species", "coleop", "sum", "3CS"))))
+sp.rare.Z[is.na(sp.rare.Z)] <- 0
+sp.rare.Z <- sp.rare.Z[, apply(sp.rare.Z, 2, sum) != 0]
+
+# run accumulation curve analyses in iNEXT
+# accum.sp.reads.Z <- iNEXT(sp.rare.Z, q=0, datatype="abundance", endpoint = 60000, knots = 100)
+# saveRDS(accum.sp.reads.Z, "output/accum.sp.reads.Z.rds")
+accum.sp.reads.Z <- readRDS("output/accum.sp.reads.Z.rds")
+rm(sp.rare.Z)
+Z.sp.df <- accum.sp.reads.Z$iNextEst$coverage_based
+
+### Coleop
+
+sp.rare.C <- as.data.frame(select(art_sp_reads, !contains(c("species", "zeale", "sum"))))
+sp.rare.C[is.na(sp.rare.C)] <- 0
+sp.rare.C <- sp.rare.C[, apply(sp.rare.C, 2, sum) != 0]
+
+# run accumulation curve analyses in iNEXT
+# accum.sp.reads.C <- iNEXT(sp.rare.C, q=0, datatype="abundance", endpoint = 60000, knots = 100)
+# saveRDS(accum.sp.reads.C, "output/accum.sp.reads.C.rds")
+accum.sp.reads.C <- readRDS("output/accum.sp.reads.C.rds")
+rm(sp.rare.C)
+C.sp.df <- accum.sp.reads.C$iNextEst$coverage_based
+
+# make plots 
+
+### MOTU level
+
+### zeale 
+
+(zrareplot <- Z.df %>%
+  group_by(Assemblage) %>%
+  mutate(pct = qD / max(qD)) %>%
+  filter(Method %in% c("Rarefaction", "Observed")) %>%
+ggplot() +
+  geom_line(aes(x = m, y = qD, color = Assemblage)) +
+  geom_line(aes(x = m, y = qD, color = Assemblage), data = filter(Z.df, Method == "Extrapolation"), lty = 2) +
+  geom_point(aes(x = m, y = qD, color = Assemblage), data = filter(Z.df, Method == "Observed"), size = 2) +
+  guides(color = "none") +
+  scale_x_continuous(limits = c(0, 60000)) +
+  scale_y_continuous(limits = c(0, 100)) +
+  labs(x = "No. arthropod reads", y = "No. MOTUs (COI primer set)") +
+  theme_bw() +
+  theme(text = element_text(size = 12))
+)
+  
+### coleop
+
+(crareplot <- C.df %>%
+  filter(Method %in% c("Rarefaction", "Observed")) %>%
+ggplot() +
+  geom_line(aes(x = m, y = qD, color = Assemblage)) +
+  geom_line(aes(x = m, y = qD, color = Assemblage), data = filter(C.df, Method == "Extrapolation"), lty = 2) +
+  geom_point(aes(x = m, y = qD, color = Assemblage), data = filter(C.df, Method == "Observed"), size = 2) +
+  guides(color = "none") +
+  scale_x_continuous(limits = c(0, 60000)) +
+  scale_y_continuous(limits = c(0, 216)) +
+  labs(x = "No. arthropod reads", y = "No. MOTUs (16S primer set)") +
+  theme_bw() +
+  theme(text = element_text(size = 12))
+)
+
+gg <- gridExtra::arrangeGrob(crareplot, zrareplot, ncol = 2)
+plot(gg)
+
+ggsave(plot = gg, "figures/rev_FigS1_MOTU_rarefaction_curves2.png", dpi = 400, width = 6, height = 3.5)
+```
+
+# random calculations for the results and discussion
+```{r}
+
+# how many carabids in COI samples
+sum(apply(select(art_full[!is.na(art_full$family) & art_full$family=="Carabidae",], contains(c("CS", "CR", "DS", "DR"))), 2, sum)>0)
+# 31
+
+# out of
+length(apply(select(art_full, contains(c("CS", "CR", "DS", "DR"))), 2, sum)>0)
+# 37
+
 # how many MOTUs not identified to species
 (cs3 %>% filter(!is.na(species)) %>% tally())
 nrow(cs3)
@@ -3375,49 +3521,4 @@ nrow(zs3)
 
 ```
 
-# read-based rarefaction curves
-```{r}
-
-library(iNEXT)
-
-# Format data
-
-# create accumulation curves
-
-# run accumulation curve analyses in iNEXT
-accum.motu.reads.Z <- iNEXT(
-  as.data.frame(select(filter(art_motu_reads, grepl(id, pattern = "Z")), !contains(c("id", "coleop", "sum", "3CS")))), 
-                            q=0, datatype="abundance", endpoint = 60000, knots = 100)
-saveRDS(accum.motu.reads.Z, "output/accum.motu.reads.Z.rds")
-
-Z.df <- accum.motu.reads.Z$iNextEst$coverage_based
-saveRDS(Z.df, "output/accum.motu.reads.Z.df.rds")
-
-# run accumulation curve analyses in iNEXT
-accum.motu.reads.C <- iNEXT(
-  as.data.frame(select(filter(art_motu_reads, grepl(id, pattern = "C")), !contains(c("id", "zeale", "sum")))), 
-                            q=0, datatype="abundance", endpoint = 60000, knots = 100)
-saveRDS(accum.motu.reads.C, "output/accum.motu.reads.C.rds")
-
-C.df <- accum.motu.reads.C$iNextEst$coverage_based
-saveRDS(C.df, "output/accum.motu.reads.C.df.rds")
-
-# make plots 
-
-Z.df %>%
-  filter(Method %in% c("Rarefaction", "Observed")) %>%
-ggplot() +
-  geom_line(aes(x = m, y = qD, color = Assemblage)) +
-  geom_line(aes(x = m, y = qD, color = Assemblage), data = filter(Z.df, Method == "Extrapolation"), lty = 3) +
-  guides(color = "none") +
-  scale_x_continuous(limits = c(0,50000))
-
-C.df %>%
-  filter(Method %in% c("Rarefaction", "Observed")) %>%
-ggplot() +
-  geom_line(aes(x = m, y = qD, color = Assemblage)) +
-  geom_line(aes(x = m, y = qD, color = Assemblage), data = filter(C.df, Method == "Extrapolation"), lty = 3) +
-  guides(color = "none") +
-  scale_x_continuous(limits = c(0,50000))
-```
 
