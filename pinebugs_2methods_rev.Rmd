@@ -1,5 +1,5 @@
-# Arthropod metabarcoding (roller and spray eDNA aggregation methods)
-Second field effort testing roller and spray aggregation methods with n = 20 samples each.
+# Arthropod metabarcoding of surface eDNA samples
+Samples were taken from tree bark ('roller aggregation') and understory foliage ('spray aggregation') in Colliers Mills Wildlife Management Area, New Jersey.
 
 # Load libraries. Read, clean and format data
 ```{r}
@@ -1709,6 +1709,7 @@ plot(gg)
 # Fig. 4A - NMDS COI vs 16S, Spray vs Roller, conifer vs. deciduous 
 ```{r}
 # format data matrices
+
 mds.data.sp <- rbind(sprayZ_sp_mat,
                   rollZ_sp_mat,
                   sprayC_sp_mat,
@@ -1725,19 +1726,20 @@ mds.data.fam <- rbind(sprayZ_fam_mat,
                   rollC_fam_mat)
 
 # check for blank rows
-apply(mds.data.sp, 1, max)
-apply(mds.data.gen, 1, max)
-apply(mds.data.fam, 1, max)
+sort(apply(mds.data.sp, 1, max)) # sample.9DR_zeale has no species
+sort(apply(mds.data.gen, 1, max))
+sort(apply(mds.data.fam, 1, max))
 
 # remove blank rows (no blanks)
   # these result from samples where no MOTUs were ID'd to this taxonomic level
+
 mds.data.sp.nb <- mds.data.sp[-which(rownames(mds.data.sp) %in% 
                                      c("sample.9DR_zeale")),]
-
 mds.data.gen.nb <- mds.data.gen
-
 mds.data.fam.nb <- mds.data.fam
-  
+
+### Species level
+
 # format covariate data - species level
 env.data <- data.frame(
   tree = str_sub(gsub(gsub(rownames(mds.data.sp.nb), 
@@ -1760,7 +1762,7 @@ set.seed(110)
 # arthNMDS.sp = metaMDS(mds.data.sp.nb,
 #                      k=2, distance = 'jaccard', trymax = 10000)
 # saveRDS(arthNMDS.sp, "output/arthNMDS.sp.swarm1.rds")
-arthNMDS.sp <- readRDS("output/arthNMDS.sp.rds")
+arthNMDS.sp <- readRDS("output/arthNMDS.sp.swarm1.rds")
 arthNMDS.sp # stress: 0.1201
 
 plot1 <- ordiplot(arthNMDS.sp, choices = c(1, 2))
@@ -1792,7 +1794,7 @@ str(sites.long1)
                                   "firebrick","firebrick", "firebrick", "firebrick")) +
     scale_fill_manual(values = c("white", "steelblue", "white", "steelblue", 
                                   "white", "firebrick", "white", "firebrick")) +
-    scale_shape_manual(values = c(21, 21, 24, 24, 21, 21, 24, 24)) +
+    scale_shape_manual(values = c(24, 24, 21, 21, 24, 24, 21, 21)) +
     geom_point(
       aes(
         x = axis1,
@@ -1837,9 +1839,7 @@ perm_arth
 
 ### genus level ###
 
-# format covariate data - species level
-
-# format covariate data - species level
+# format covariate data - genus level
 env.data.gen <- data.frame(
   tree = str_sub(gsub(gsub(rownames(mds.data.gen.nb), 
                            pattern="_zeale", replacement = ""),
@@ -1893,7 +1893,7 @@ str(sites.long1.gen)
                                   "firebrick","firebrick", "firebrick", "firebrick")) +
     scale_fill_manual(values = c("white", "steelblue", "white", "steelblue", 
                                   "white", "firebrick", "white", "firebrick")) +
-    scale_shape_manual(values = c(21, 21, 24, 24, 21, 21, 24, 24)) +
+    scale_shape_manual(values = c(24, 24, 21, 21, 24, 24, 21, 21)) +
     geom_point(
       aes(
         x = axis1,
@@ -1959,8 +1959,8 @@ set.seed(110)
 # arthNMDS.fam = metaMDS(mds.data.fam.nb,
 #                      k=2, distance = 'jaccard', trymax = 10000)
 # saveRDS(arthNMDS.fam, "output/arthNMDS.fam.swarm1.rds")
-arthNMDS.fam <- readRDS("output/arthNMDS.fam.rds")
-arthNMDS.fam # stress = 0.202
+arthNMDS.fam <- readRDS("output/arthNMDS.fam.swarm1.rds")
+arthNMDS.fam # stress = 0.2036
 
 plot1.fam <- ordiplot(arthNMDS.fam, choices = c(1, 2))
 
@@ -1991,7 +1991,7 @@ str(sites.long1.fam)
                                   "firebrick","firebrick", "firebrick", "firebrick")) +
     scale_fill_manual(values = c("white", "steelblue", "white", "steelblue", 
                                   "white", "firebrick", "white", "firebrick")) +
-    scale_shape_manual(values = c(21, 21, 24, 24, 21, 21, 24, 24)) +
+    scale_shape_manual(values = c(24, 24, 21, 21, 24, 24, 21, 21)) +
     geom_point(
       aes(
         x = axis1,
@@ -2003,7 +2003,7 @@ str(sites.long1.fam)
       size = 3,
       alpha = 0.85
     ) +
-    annotate("text", x = -1.7, y = -0.7, label = "Stress = 0.202", hjust = 0, size = 3) +
+    annotate("text", x = -1.7, y = -0.7, label = "Stress = 0.204", hjust = 0, size = 3) +
     # coord_fixed(ratio = 1) +
     labs(
       y = "NMDS2",
@@ -2027,11 +2027,11 @@ perm_arth.fam <- adonis2(mds.data.fam.nb ~ primer + method + tree, data = env.da
 
 perm_arth.fam
 #          Df SumOfSqs      R2       F Pr(>F)    
-# primer    1   3.2447 0.12936 11.3494 0.0001 ***
-# method    1   1.6348 0.06518  5.7183 0.0001 ***
-# tree      1   0.4766 0.01900  1.6670 0.0197 *  
-# Residual 69  19.7265 0.78646                   
-# Total    72  25.0826 1.00000  
+# primer    1   3.2834 0.13132 11.5530 0.0001 ***
+# method    1   1.6291 0.06516  5.7322 0.0001 ***
+# tree      1   0.4803 0.01921  1.6902 0.0177 *  
+# Residual 69  19.6100 0.78431                   
+# Total    72  25.0028 1.00000 
 
 # plot will be saved in the next step (Fig. 4B)
 ```
@@ -3254,6 +3254,7 @@ kable(orderreads_S3, "html") %>%
   cat(., file = "figures/tableS3_reads_tally_species.html")
 
 ```
+
 # Examining reference databases
 ```{r}
 
@@ -3351,6 +3352,7 @@ mamgen <- c("Blarina", "Canis", "Didelphis", "Eptesicus",
 
 # mammal families
 c_mam %>% filter(species %in% mamlist) %>% select(family) %>% distinct()
+c_mamfam <- taxize::tax_name(mamgen, db = "ncbi", get = "family")
 
 # count mammal reads
 c_mam %>% filter((genus %in% mamgen) | (family == "Sciuridae")) %>% select(count) %>% sum()
@@ -3497,7 +3499,224 @@ plot(gg)
 
 ggsave(plot = gg, "figures/rev_FigS1_MOTU_rarefaction_curves2.png", dpi = 400, width = 6, height = 3.5)
 ```
+# Figure S3. NMDS at MOTU level
+```{r}
+# format data matrices
+mds.data.motu.Z <- rbind(sprayZ_motu_mat,
+                  rollZ_motu_mat)
 
+mds.data.motu.C <- rbind(sprayC_motu_mat,
+                  rollC_motu_mat)
+
+# check for blank rows
+sort(apply(mds.data.motu.Z, 1, max))
+sort(apply(mds.data.motu.C, 1, max))
+
+# remove blank rows (no blanks)
+  # these result from samples where no MOTUs were detected
+
+mds.data.motu.Z.nb <- mds.data.motu.Z
+mds.data.motu.C.nb <- mds.data.motu.C
+
+### MOTU level ###
+
+# format covariate data - motu level
+env.data.motu.Z <- data.frame(
+  tree = str_sub(gsub(gsub(rownames(mds.data.motu.Z.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                      -2, -2),
+  method = str_sub(gsub(gsub(rownames(mds.data.motu.Z.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                        -1, -1)) %>%
+  mutate(tree = case_when(tree == "C" ~ "Conifer",
+                          tree == "D" ~ "Decid."),
+         method = case_when(method == "R" ~ "Bark",
+                            method == "S" ~ "Leaves"))
+
+### zeale 
+
+# package vegan NMDS
+set.seed(110)
+# arthNMDS.motu.Z = metaMDS(mds.data.motu.Z.nb,
+#                      k=2, distance = 'jaccard', trymax = 10000)
+# saveRDS(arthNMDS.motu.Z, "output/arthNMDS.motu.Z.swarm1.rds")
+arthNMDS.motu.Z <- readRDS("output/arthNMDS.motu.Z.swarm1.rds")
+arthNMDS.motu.Z # stress: 0.2392
+
+plot1 <- ordiplot(arthNMDS.motu.Z, choices = c(1, 2))
+
+sites.long1 <-
+  BiodiversityR::sites.long(plot1, env.data = env.data.motu.Z) %>%
+  mutate(axis1 = as.numeric(axis1),
+         axis2 = as.numeric(axis2),
+         Method = paste0(method, " - ", tree))
+head(sites.long1)
+str(sites.long1)
+
+(
+  plot.motu.Z <-
+    ggplot(sites.long1) +
+    geom_vline(
+      xintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    geom_hline(
+      yintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_color_manual(values = c("steelblue", "steelblue", 
+                                  "firebrick","firebrick" )) +
+    scale_fill_manual(values = c("steelblue", "steelblue", 
+                                  "firebrick","firebrick" )) +
+    scale_shape_manual(values = c(24, 21, 24, 21)) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2,
+        shape = Method,
+        color = Method,
+        fill = Method,
+      ),
+      size = 3,
+      alpha = 0.85
+    ) +
+    annotate("text", x = -.5, y = -.5, label = "Stress = 0.239", hjust = 0, size = 3) +
+    # coord_fixed(ratio = 1) +
+    labs(
+      y = "NMDS2",
+      x = "NMDS1",
+      color = "Substrate",
+      shape = "Tree type"
+    ) +
+    theme_bw() +
+    theme(text = element_text(size = 12)) +
+    ggtitle("COI primer set") +
+   guides(shape = "none", color = "none", fill = "none")
+)
+
+
+# Test for differences among Method and Tree type
+# PERMANOVA
+set.seed(12555)
+perm_arth <- adonis2(mds.data.motu.Z.nb ~ method + tree, data = env.data.motu.Z, 
+       permutations = 9999, method = "jaccard",
+       strata = NULL, contr.unordered = "contr.sum",
+       contr.ordered = "contr.poly")
+
+perm_arth
+#          Df SumOfSqs      R2      F Pr(>F)    
+# method    1   1.1389 0.07242 2.6709 0.0001 ***
+# tree      1   0.5155 0.03278 1.2089 0.0405 *  
+# Residual 33  14.0722 0.89480                  
+# Total    35  15.7267 1.00000  
+
+### coleop 
+
+# format environmental data
+env.data.motu.C <- data.frame(
+  tree = str_sub(gsub(gsub(rownames(mds.data.motu.C.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                      -2, -2),
+  method = str_sub(gsub(gsub(rownames(mds.data.motu.C.nb), 
+                           pattern="_zeale", replacement = ""),
+                      pattern="_coleop", replacement = ""), 
+                                        -1, -1)) %>%
+  mutate(tree = case_when(tree == "C" ~ "Conifer",
+                          tree == "D" ~ "Decid."),
+         method = case_when(method == "R" ~ "Bark",
+                            method == "S" ~ "Leaves"))
+
+# package vegan NMDS
+set.seed(110)
+# arthNMDS.motu.C = metaMDS(mds.data.motu.C.nb,
+#                      k=2, distance = 'jaccard', trymax = 10000)
+# saveRDS(arthNMDS.motu.C, "output/arthNMDS.motu.C.swarm1.rds")
+arthNMDS.motu.C <- readRDS("output/arthNMDS.motu.C.swarm1.rds")
+arthNMDS.motu.C # stress: 0.2312
+
+plot1 <- ordiplot(arthNMDS.motu.C, choices = c(1, 2))
+
+sites.long1 <-
+  BiodiversityR::sites.long(plot1, env.data = env.data.motu.C) %>%
+  mutate(axis1 = as.numeric(axis1),
+         axis2 = as.numeric(axis2),
+         Method = paste0(method, " - ", tree))
+head(sites.long1)
+str(sites.long1)
+
+(
+  plot.motu.C <-
+    ggplot(sites.long1) +
+    geom_vline(
+      xintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    geom_hline(
+      yintercept = c(0),
+      color = "grey70",
+      linetype = 2
+    ) +
+    scale_x_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_y_continuous(sec.axis = dup_axis(labels = NULL, name = NULL)) +
+    scale_color_manual(values = c("steelblue", "steelblue", 
+                                  "firebrick","firebrick" )) +
+    scale_fill_manual(values = c("steelblue", "steelblue", 
+                                  "firebrick","firebrick" )) +
+    scale_shape_manual(values = c(24, 21, 24, 21)) +
+    geom_point(
+      aes(
+        x = axis1,
+        y = axis2,
+        shape = Method,
+        color = Method,
+        fill = Method,
+      ),
+      size = 3,
+      alpha = 0.85
+    ) +
+    annotate("text", x = -.5, y = -.5, label = "Stress = 0.231", hjust = 0, size = 3) +
+    # coord_fixed(ratio = 1) +
+    labs(
+      y = "NMDS2",
+      x = "NMDS1",
+      color = "Substrate",
+      shape = "Tree type"
+    ) +
+    theme_bw() +
+    theme(text = element_text(size = 12)) +
+    ggtitle("16S primer set") +
+   guides(shape = "none", color = "none", fill = "none")
+)
+
+
+# Test for differences among Method and Tree type
+# PERMANOVA
+set.seed(12555)
+perm_arth <- adonis2(mds.data.motu.C.nb ~ method + tree, data = env.data.motu.C, 
+       permutations = 9999, method = "jaccard",
+       strata = NULL, contr.unordered = "contr.sum",
+       contr.ordered = "contr.poly")
+
+perm_arth
+#          Df SumOfSqs      R2      F Pr(>F)    
+# method    1   1.0374 0.06864 2.6010 0.0001 ***
+# tree      1   0.5160 0.03414 1.2938 0.0115 *  
+# Residual 34  13.5604 0.89722                  
+# Total    36  15.1138 1.00000    
+
+gg <- gridExtra::arrangeGrob(plot.motu.Z, plot.motu.C, ncol = 2)
+plot(gg)
+
+ggsave(plot = gg, "figures/rev_FigS3_motu_level_NMDS2.png", dpi = 400, width = 6, height = 3.5)
+```
 # random calculations for the results and discussion
 ```{r}
 
@@ -3518,7 +3737,33 @@ nrow(cs3)
 nrow(zs3)
 227/645 # 0.3519
 
+# how many insect species and families (no spiders etc.)
+cs3insect <- cs3 %>% 
+  filter(class == "Insecta")
 
+zs3insect <- zs3 %>% 
+  filter(class == "Insecta")
+
+unique(c(cs3insect$family, zs3insect$family)) # 159 families
+unique(c(cs3insect$species, zs3insect$species)) # 278 species
+
+# time estimates from Anthony and Bobby
+# 
+# Extractions (20 hrs)
+# PCR optimization (40-80 hrs)
+# Inhibitor Cleanup (4 hrs)
+# PCR1 (each primer set) (16 hrs)
+# Bead 1 (6 hrs)
+# Gels (6 hrs)
+# Quibit + Pool (4 hrs)
+# PCR 2 (8 hrs)
+# Bead 2- 4 hrs
+# Qubit 2 (4 hrs)
+# Gel 2 (4 hrs)
+# Pool/ send for sequencing (3 hrs)
+
+20+40+4+16+6+6+4+8+4+4+4+3
+20+80+4+16+6+6+4+8+4+4+4+3
 ```
 
 

@@ -14,6 +14,10 @@ z <- z0 %>%
   filter(match >= 0.80)
 # 649 of 819 left
 
+# make df of MOTUs with < 80% match to BLAST (based on reviewer comment)
+z80 <- z0 %>%
+  filter(match < 0.80)
+
 # 138 are well matched to species already
 test <- z %>% filter(match >= 0.99,
              !is.na(species_name))
@@ -42,6 +46,10 @@ c0 <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm1.fix.tag.ann
 c <- c0 %>%
   filter(match >= 0.80)
 # 1084 of 1179 left
+
+# make df of MOTUs with < 80% match to BLAST (based on reviewer comment)
+c80 <- c0 %>%
+  filter(match < 0.80)
 
 # 116 are well matched to species already
 test2 <- c %>% filter(match >= 0.99,
@@ -124,6 +132,7 @@ for (i in 1:nrow(input_db)) {
 
 ```
 # stitch together the output of the blast searches (if applicable)
+BLAST the fasta files created in the last step with blastn (BLAST+) in command line on the cluster. Then process all the text files created using that process here.
 If not using blast, then skip to "separate the samples and negatives".
 Headers of the tables: https://www.metagenomics.wiki/tools/blast/blastn-output-format-6
 ```{r}
