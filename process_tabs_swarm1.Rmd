@@ -37,6 +37,9 @@ zc <- fread("data/merged.uni.c10.l130.L185.sht.srt.nochi.1line.swarm1.Z_output.c
 zz <- z %>%
   left_join(zc, by = join_by(id, definition, sequence))
 
+zz80 <- z80 %>%
+  left_join(zc, by = join_by(id, definition, sequence))
+
 ### Coleop ###
 
 # Read in Coleop (16S) primer results
@@ -69,6 +72,10 @@ c2 <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm1.C_output.co
 
 cc <- c %>%
   left_join(c2, by = join_by(id, definition, sequence))
+
+cc80 <- c80 %>%
+  left_join(c2, by = join_by(id, definition, sequence))
+  
 
 ```
 # make fasta files to blast (if applicable)
