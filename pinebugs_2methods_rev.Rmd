@@ -23,10 +23,10 @@ tax_data_path <- "data/arthropod.families_20220816.xlsx"
 
 # read in Zeale & Coleop MOTU data with taxonomy
   # excludes MOTUs that were filtered out during negative subtraction etc.
-zs3 <- read.csv("data/pinebugs.samples.onlyarth.negsub.Z.csv") %>%
+zs3 <- read.csv("data/pinebugs.samples.onlyarth.negsub.Z_allMOTUs.csv") %>%
   filter(sampsum != 0)
 
-cs3 <- read.csv("data/pinebugs.samples.onlyarth.negsub.C.csv") %>%
+cs3 <- read.csv("data/pinebugs.samples.onlyarth.negsub.C_allMOTUs.csv") %>%
   filter(sampsum != 0)
 
 # read in family trait info (life mode)
@@ -294,7 +294,7 @@ rollZ_motu_mat[rollZ_motu_mat>0] <- 1
 colnames(rollZ_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "Z"))$id
 
 # both - zeale - sp level
-zeromat.motu.Z <- matrix(0,1,645)
+zeromat.motu.Z <- matrix(0,1,650)
 sprayZ_motu_mat2 <- rbind(sprayZ_motu_mat[1:2,],
                          zeromat.motu.Z,
                          sprayZ_motu_mat[3:9,],
@@ -329,7 +329,7 @@ rollC_motu_mat[rollC_motu_mat>0] <- 1
 colnames(rollC_motu_mat) <- filter(art_motu_reads, grepl(id, pattern = "C"))$id
 
 # both - coleop - motu level
-zeromat.motu.C <- matrix(0,1,1025)
+zeromat.motu.C <- matrix(0,1,1078)
 sprayC_motu_mat2 <- rbind(sprayC_motu_mat[1:10,],
                          zeromat.motu.C,
                          sprayC_motu_mat[11,],
@@ -437,7 +437,7 @@ rollZ_gen_mat[rollZ_gen_mat>0] <- 1
 colnames(rollZ_gen_mat) <- art_gen_reads$genus
 
 # both - zeale - genus level
-zeromat.gen <- matrix(0,1,354)
+zeromat.gen <- matrix(0,1,356)
 sprayZ_gen_mat2 <- rbind(sprayZ_gen_mat[1:2,],
                          zeromat.gen,
                          sprayZ_gen_mat[3:9,],
@@ -513,7 +513,7 @@ rollZ_fam_mat[rollZ_fam_mat>0] <- 1
 colnames(rollZ_fam_mat) <- art_fam_reads$family
 
 # both - zeale - family level
-zeromat <- matrix(0,1,179)
+zeromat <- matrix(0,1,181)
 sprayZ_fam_mat2 <- rbind(sprayZ_fam_mat[1:2,],
                          zeromat,
                          sprayZ_fam_mat[3:9,],
@@ -741,7 +741,7 @@ orders_df %>%
 library(patchwork)
 hdiv_plot / ldiv_plot
 
-ggsave("figures/rev_Fig1_nosub_ordermotus_swarm1_1.png", height = 9, width = 7.5, dpi = 400)
+ggsave("figures/rev_Fig1_nosub_ordermotus_swarm1_allMOTUs.png", height = 9, width = 7.5, dpi = 400)
 
 ```
 # Fig. 1 (new) - this time including leaves vs. bark
@@ -992,7 +992,7 @@ orders_df2 %>%
 library(patchwork)
 hdiv_plot / ldiv_plot
 
-ggsave("figures/rev_Fig1alt_ordermotussub_swarm1_2.png",
+ggsave("figures/rev_Fig1alt_ordermotussub_swarm1_allMOTUs.png",
        height = 9, width = 7.5, dpi = 400)
 
 ```
@@ -1054,7 +1054,7 @@ library(magrittr)
 
 kable(orders_df3, "html") %>%
   kable_styling(bootstrap_options = c("striped", "hover")) %>%
-  cat(., file = "figures/table1_motu_tally.html")
+  cat(., file = "figures/table1_motu_tally_allMOTUs.html")
 
 
 ```
@@ -1163,7 +1163,7 @@ library(magrittr)
 
 kable(ordereads_df, "html") %>%
   kable_styling(bootstrap_options = c("striped", "hover")) %>%
-  cat(., file = "figures/table1_reads_tally_2.html")
+  cat(., file = "figures/table1_reads_tally_allMOTUs.html")
 
 ```
 
@@ -1246,7 +1246,7 @@ accum.fam.sub <- iNEXT(accum.data.fam.sub, q=0, datatype="incidence_raw", endpoi
 (motuplot.primer <-
 ggiNEXT(accum.motu.primer, type=1, se=TRUE, facet.var="None", color.var="Assemblage", grey=FALSE) +
   scale_x_continuous(limits = c(0,80)) +
-  scale_y_continuous(limits = c(0,2000)) +
+  scale_y_continuous(limits = c(0,2100)) +
   labs(y = "No. MOTUs",
        x = "No. samples") +
     theme_bw() +
@@ -1401,7 +1401,7 @@ library(patchwork)
 motuplot.primer + motuplot.sub + plot_spacer() + spplot.primer + spplot.sub + 
   genplot.primer + genplot.sub + plot_spacer() + famplot.primer + famplot.sub + 
   plot_layout(ncol = 5, widths = c(0.5, 0.5, 0.15, 0.5, 0.5, 0.5, 0.5, 0.15, 0.5, 0.5))
-ggsave("figures/rev_Fig2new_accumcurves.swarm1_16.png", dpi = 400, width = 11, height = 10)
+ggsave("figures/rev_Fig2new_accumcurves.swarm1_allMOTUs2.png", dpi = 400, width = 11, height = 10)
 
 
 ```
@@ -1554,23 +1554,23 @@ xtextsize = 11
 library(brms)
 # (Smod <- brm(log(S) ~ tree + method + primer, data = rarefy_df20, cores = 4,
 #              iter = 4000, warmup = 2000))
-# saveRDS(Smod, "output/Smod_swarm1.rds")
-(Smod <- readRDS("output/Smod_swarm1.rds"))
+# saveRDS(Smod, "output/Smod_swarm1_allMOTUs.rds")
+(Smod <- readRDS("output/Smod_swarm1_allMOTUs.rds"))
 # *** = 99% don't overlap; ** = 95% don't overlap; * = 90% don't overlap
 #                  Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
-# Intercept            3.67      0.11     3.45     3.90 1.00    10828     6523
-# treeDeciduous        0.19      0.12    -0.04     0.43 1.00    10222     5893
-# methodUnderstory     0.60      0.13     0.34     0.84 1.00    10486     5931***
-# primerCOI           -0.71      0.12    -0.95    -0.47 1.00    10306     6053***
+# Intercept            3.80      0.11     3.58     4.02 1.00     9944     5992
+# treeDeciduous        0.19      0.11    -0.04     0.42 1.00     9699     5911
+# methodUnderstory     0.53      0.12     0.28     0.77 1.00     9261     6607***
+# primerCOI           -0.80      0.12    -1.03    -0.57 1.00    10403     5953***
 
 
 library(tidybayes)
 quantile(spread_draws(Smod, b_treeDeciduous)$b_treeDeciduous, c(0.05, 0.95)) 
-# -0.005369158  0.393345586
+# -0.001655841  0.375785682
 quantile(spread_draws(Smod, b_methodUnderstory)$b_methodUnderstory, c(0.005, 0.995)) 
-# 0.2669806 0.9223578 
+# 0.2123532 0.8452040 
 quantile(spread_draws(Smod, b_primerCOI)$b_primerCOI, c(0.005, 0.995)) 
-# -1.0213068 -0.3900637 
+# -1.1147080 -0.4955531
 
 Smod_df <- conditional_effects(Smod, prob = 0.95) %>%
   do.call(rbind, .) %>%
@@ -1600,6 +1600,7 @@ Smod_df %>%
 )
 
 # Evenness model
+### PROGRESS !!!! ###
 
 library(brms)
 (Simpmod <- brm(simpson ~ tree + method + primer, data = simpson_df20, cores = 4,

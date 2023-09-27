@@ -7,18 +7,10 @@ library(data.table)
 ### Zeale ###
 
 # Read in Zeale (COI) primer results (all raw data = 560 MOTUs)
-z0 <- fread("data/merged.uni.c10.l130.L185.sht.srt.nochi.1line.swarm1.fix.tag.ann.srt.Z.tsv") %>%
-  rename(match = 3) 
+z <- fread("data/merged.uni.c10.l130.L185.sht.srt.nochi.1line.swarm1.fix.tag.ann.srt.Z.tsv") %>%
+  rename(match = 3) # 819 MOTUs
 
-z <- z0 %>%
-  filter(match >= 0.80)
-# 649 of 819 left
-
-# make df of MOTUs with < 80% match to BLAST (based on reviewer comment)
-z80 <- z0 %>%
-  filter(match < 0.80)
-
-# 138 are well matched to species already
+# 138 are well matched to species already, so 681 to BLAST
 test <- z %>% filter(match >= 0.99,
              !is.na(species_name))
 nrow(test)
@@ -27,7 +19,7 @@ nrow(test)
 sort(unique(test$scientific_name))
 rm(test)
 
-# that leaves 511 to blast if desired (to format for this, see make_blast.Rmd)
+# that leaves 681 to blast if desired (to format fasta for this, see next section)
 zblast <- z %>% 
   filter(!(match >= 0.99 & !is.na(species_name)))
 
@@ -37,22 +29,11 @@ zc <- fread("data/merged.uni.c10.l130.L185.sht.srt.nochi.1line.swarm1.Z_output.c
 zz <- z %>%
   left_join(zc, by = join_by(id, definition, sequence))
 
-zz80 <- z80 %>%
-  left_join(zc, by = join_by(id, definition, sequence))
-
 ### Coleop ###
 
 # Read in Coleop (16S) primer results
-c0 <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm1.fix.tag.ann.srt.C.tsv") %>%
-  rename(match = 3)
-
-c <- c0 %>%
-  filter(match >= 0.80)
-# 1084 of 1179 left
-
-# make df of MOTUs with < 80% match to BLAST (based on reviewer comment)
-c80 <- c0 %>%
-  filter(match < 0.80)
+c <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm1.fix.tag.ann.srt.C.tsv") %>%
+  rename(match = 3) # 1179 MOTUs
 
 # 116 are well matched to species already
 test2 <- c %>% filter(match >= 0.99,
@@ -63,7 +44,7 @@ nrow(test2)
 sort(unique(test2$scientific_name))
 rm(test2)
 
-# that leaves 968 to blast
+# that leaves 1063 to blast
 cblast <- c %>% 
   filter(!(match >= 0.99 & !is.na(species_name)))
 
@@ -73,13 +54,9 @@ c2 <- fread("data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm1.C_output.co
 cc <- c %>%
   left_join(c2, by = join_by(id, definition, sequence))
 
-cc80 <- c80 %>%
-  left_join(c2, by = join_by(id, definition, sequence))
-  
-
 ```
 # make fasta files to blast (if applicable)
-See make_blast.Rmd for code to do this. Otherwise, skip to "separate the samples and negatives". The output from performing blastn on these sequences is a series of text files that are combined in the next step.
+Otherwise, skip to "separate the samples and negatives". The output from performing blastn on these sequences is a series of text files that are combined in the next step.
 ```{r}
 
 # Zeale
@@ -353,7 +330,7 @@ At this point, the identifications were manually curated (reivewed against BLAST
 
 ### Zeale ###
 
-zzblastID.cur <- read.csv("data/zzblastID_swarm1_finaltax.csv")
+zzblastID.cur <- read.csv("data/zzblastID_swarm1_finaltax_allMOTUs.csv")
 
 zz_fin <- zz %>%
   left_join(select(zzblastID.cur, id, bestblastmatch, overrideID, blastnotes)) %>%
@@ -368,7 +345,7 @@ zz_fin <- zz %>%
 
 ### Coleop ###
 
-ccblastID.cur <- read.csv("data/ccblastID_swarm1_finaltax.csv")
+ccblastID.cur <- read.csv("data/ccblastID_swarm1_finaltax_allMOTUs.csv")
 
 cc_fin <- cc %>%
   left_join(select(ccblastID.cur, id, bestblastmatch, overrideID, blastnotes)) %>%
@@ -388,8 +365,15 @@ Note: there is surely a better way to do this (e.g., using a for loop), but the 
 
 # library(taxize)
 # 
-# #### adding higher taxa
-taxlistfull <- sort(unique(c(cc_fin$finaltax, zz_fin$finaltax)))
+# #### adding higher taxa 
+# (first subsetting the taxa with >80% bestmatch for historical reasons)
+# (i.e., I did it this way originally and then went back and did those < 80%)
+ccfin80plus <- cc_fin %>%
+  filter(ecotagmatch >= 0.8)
+zzfin80plus <- zz_fin %>%
+  filter(ecotagmatch >= 0.8)
+
+taxlistfull <- sort(unique(c(ccfin80plus$finaltax, zzfin80plus$finaltax)))
 # taxlist1 <- taxlistfull[1:50]
 # # add taxonomy to the lowest taxa rank based on NCBI database
 # full_tax_lookup1 <- taxize::tax_name(sci = taxlist1,
@@ -510,6 +494,25 @@ taxlistfull <- sort(unique(c(cc_fin$finaltax, zz_fin$finaltax)))
 #                    db = "ncbi")
 # write.csv(full_tax_lookup15, "data/full_tax_lookup15.csv", row.names = F)
 
+# make a taxlist just for those MOTUs with bestmatches of < 80%
+
+cc_fin80 <- cc_fin %>%
+  filter(ecotagmatch < 0.8,
+         finaltax %notin% taxlistfull)
+zz_fin80 <- zz_fin %>%
+  filter(ecotagmatch < 0.8,
+         finaltax %notin% taxlistfull)
+taxlist80 <- sort(unique(c(cc_fin80$finaltax, zz_fin80$finaltax)))
+
+taxlist16 <- taxlist80
+# add orders to the lowest taxa rank based on NCBI database
+full_tax_lookup16 <- taxize::tax_name(sci = taxlist16,
+                   get = c("species", "genus", "family", "order", "class",
+                           "phylum", "kingdom"),
+                   db = "ncbi")
+write.csv(full_tax_lookup16, "data/full_tax_lookup16.csv", row.names = F)
+
+# combine them all together
 # full_taxa_lookup <- read.csv("data/full_tax_lookup1.csv") %>%
 #   bind_rows(read.csv("data/full_tax_lookup2.csv")) %>%
 #   bind_rows(read.csv("data/full_tax_lookup3.csv")) %>%
@@ -525,15 +528,21 @@ taxlistfull <- sort(unique(c(cc_fin$finaltax, zz_fin$finaltax)))
 #   bind_rows(read.csv("data/full_tax_lookup13.csv")) %>%
 #   bind_rows(read.csv("data/full_tax_lookup14.csv")) %>%
 #   bind_rows(read.csv("data/full_tax_lookup15.csv")) %>%
-#   filter(!is.na(kingdom)) %>%
+#   bind_rows(read.csv("data/full_tax_lookup16.csv")) %>%
+#   # filter(!is.na(kingdom)) %>%
 #   rename(finaltax = query)
 
+# write the combined taxa lookup table to a csv file
 # write.csv(full_taxa_lookup, "data/full_tax_lookup.csv", row.names = F)
 full_taxa_lookup <- read.csv("data/full_tax_lookup.csv") %>%
-  distinct()
+  distinct() %>%
+  mutate(class = case_when(order == "Malawimonadida" ~ "Malawimonadida",
+                           TRUE ~ class),
+         phylum = case_when(order == "Malawimonadida" ~ "Malawimonadida",
+                            TRUE ~ phylum))
 
 # check that some change to the taxonomy in the manual taxonomy curation files did not result in a species not in the lookup table
-full_taxa_lookup$finaltax[full_taxa_lookup$finaltax %notin% taxlistfull]
+full_taxa_lookup$finaltax[full_taxa_lookup$finaltax %notin% c(taxlistfull, taxlist80)]
 
 ```
 # separate the samples and negatives and adjust taxonomy based on match score 
@@ -574,7 +583,7 @@ zs <- zz_finID %>%
   select(-all_of(negatives))
 
 # sum the reads across all samples
-sum(select(zs, starts_with("sample"))) # 4119060
+sum(select(zs, starts_with("sample"))) # 4538107
 
 # select out just the negatives
 zn <- zz_finID %>%
@@ -582,14 +591,14 @@ zn <- zz_finID %>%
          count, wt, all_of(negatives), sequence)
 
 # sum the reads across all negatives
-sum(select(zn, starts_with("sample"))) # 997
+sum(select(zn, starts_with("sample"))) # 1248
 
 # get the max read count of each seqid present in the negatives
 colnames(zn) # check which columns contain negative samples
 zn$seqmax <- apply(zn[,12:17],1, max)
 
-# write.csv(zs, file = "data/pinebugs.samples.step0.nofilters.swarm1.Z.csv", row.names = F)
-# write.csv(zn, file = "data/pinebugs.negatives.step0.nofilters.swarm1.Z.csv", row.names = F)
+# write.csv(zs, file = "data/pinebugs.samples.step0.nofilters.swarm1.Z_allMOTUs.csv", row.names = F)
+# write.csv(zn, file = "data/pinebugs.negatives.step0.nofilters.swarm1.Z_allMOTUs.csv", row.names = F)
 
 #### Coleop ####
 
@@ -626,7 +635,7 @@ cs <- cc_finID %>%
   select(-all_of(negatives.C))
 
 # sum the reads across all samples
-sum(select(cs, starts_with("sample"))) # 2218638
+sum(select(cs, starts_with("sample"))) # 2668687
 
 # select out just the negatives
 cn <- cc_finID %>%
@@ -634,14 +643,14 @@ cn <- cc_finID %>%
          count, wt, all_of(negatives.C), sequence)
 
 # sum the reads across all negatives
-sum(select(cn, starts_with("sample"))) # 58965
+sum(select(cn, starts_with("sample"))) # 60072
 
 # get the max read count of each seqid present in the negatives
 colnames(cn) # check which columns contain negative samples
 cn$seqmax <- apply(cn[,12:17],1, max)
 
-# write.csv(cs, file = "data/pinebugs.samples.step0.nofilters.swarm1.C.csv", row.names = F)
-# write.csv(cn, file = "data/pinebugs.negatives.step0.nofilters.swarm1.C.csv", row.names = F)
+# write.csv(cs, file = "data/pinebugs.samples.step0.nofilters.swarm1.C_allMOTUs.csv", row.names = F)
+# write.csv(cn, file = "data/pinebugs.negatives.step0.nofilters.swarm1.C_allMOTUs.csv", row.names = F)
 ```
 # remove humans & mice
 ```{r}
@@ -652,13 +661,13 @@ cs1 <- cs %>%
   filter(genus %notin% c("Mus", "Homo"))
 
 # sum the reads across all samples
-sum(select(cs1, starts_with("sample"))) # 2161052
+sum(select(cs1, starts_with("sample"))) # 2611101
 
 cn1 <- cn %>%
   filter(genus %notin% c("Mus", "Homo"))
 
 # sum the reads across all samples
-sum(select(cn1, starts_with("sample"))) # 5306
+sum(select(cn1, starts_with("sample"))) # 6413
 
 ### Zeale
 
@@ -666,13 +675,13 @@ zs1 <- zs %>%
   filter(genus %notin% c("Mus", "Homo"))
 
 # sum the reads across all samples
-sum(select(zs1, starts_with("sample"))) # 4119060
+sum(select(zs1, starts_with("sample"))) # 4538107
 
 zn1 <- zn %>%
   filter(genus %notin% c("Mus", "Homo"))
 
 # sum the reads across all samples
-sum(select(zn1, starts_with("sample"))) # 997
+sum(select(zn1, starts_with("sample"))) # 1248
 
 ```
 
@@ -697,14 +706,14 @@ for(i in 12:47){
 }
 
 # count remaining reads in samples
-sum(select(zs2, starts_with("sample"))) # 4116683
+sum(select(zs2, starts_with("sample"))) # 4534342
 rm(zs2a)
 
 # look at sequence lengths
 hist(nchar(zs2$sequence))
 # zs2$len <- nchar(zs2$sequence)
 
-# write.csv(zs2, "data/pinebugs.samples.step2.negsub.swarm1.Z.csv")
+# write.csv(zs2, "data/pinebugs.samples.step2.negsub.swarm1.Z_allMOTUs.csv")
 
 #### Coleop ####
 
@@ -724,7 +733,7 @@ for(i in 12:48){
 }
 
 # count remaining reads in samples
-sum(select(cs2, starts_with("sample"))) # 2158954
+sum(select(cs2, starts_with("sample"))) # 2603965
 rm(cs2a)
 
 # look at sequence lengths
@@ -752,7 +761,7 @@ names(zs3)
 zs3$sampsum <- apply(zs3[,12:47], 1, sum)
 
 # sum the reads across all samples
-sum(select(zs3, starts_with("sample"))) # 4116475
+sum(select(zs3, starts_with("sample"))) # 4117138
 
 # filter out non-arthropod - negatives
 zn3 <- zn1 %>%
@@ -765,8 +774,8 @@ zn3$negsum <- apply(zn3[,12:17], 1, sum)
 # sum the reads across all negatives
 sum(select(zn3, starts_with("sample"))) # 997
 
-# write.csv(zs3, file = "data/pinebugs.samples.onlyarth.negsub.Z.csv", row.names = F)
-# write.csv(zn3, file = "data/pinebugs.negatives.onlyarth.Z.csv", row.names = F)
+# write.csv(zs3, file = "data/pinebugs.samples.onlyarth.negsub.Z_allMOTUs.csv", row.names = F)
+# write.csv(zn3, file = "data/pinebugs.negatives.onlyarth.Z_allMOTUs.csv", row.names = F)
 
 ### Coleop ###
 
@@ -783,9 +792,9 @@ names(cs3)
 cs3$sampsum <- apply(cs3[,12:48], 1, sum)
 
 # sum the reads across all samples
-sum(select(cs3, starts_with("sample"))) # 2068121
+sum(select(cs3, starts_with("sample"))) # 2240250
 
-# filter out non-fish - negatives
+# filter out non-arthropods - negatives
 cn3 <- cn1 %>%
   filter(phylum == "Arthropoda")
 
@@ -794,10 +803,10 @@ names(cn3)
 cn3$negsum <- apply(cn3[,12:28], 1, sum)
 
 # sum the reads across all negatives
-sum(select(cn3, starts_with("sample"))) # 3402
+sum(select(cn3, starts_with("sample"))) # 4442
 
-# write.csv(cs3, file = "data/pinebugs.samples.onlyarth.negsub.C.csv", row.names = F)
-# write.csv(cn3, file = "data/pinebugs.negatives.onlyarth.C.csv", row.names = F)
+# write.csv(cs3, file = "data/pinebugs.samples.onlyarth.negsub.C_allMOTUs.csv", row.names = F)
+# write.csv(cn3, file = "data/pinebugs.negatives.onlyarth.C_allMOTUs.csv", row.names = F)
 
 ```
 
@@ -806,28 +815,28 @@ sum(select(cn3, starts_with("sample"))) # 3402
 
 ### Zeale ###
 
-# what species; n = 196 (note: was 158 with swarm d = 7)
+# what species; n = 196
 zs3 %>% filter(!is.na(species),
                sampsum > 0) %>% 
   select(species) %>%
   arrange(species) %>%
   distinct()
 
-# what genus; n = 225 (note: was 192 with swarm d = 7)
+# what genus; n = 227 (note: added 2 genera by examining MOTUs with match <80%)
 zs3 %>% filter(!is.na(genus),
                sampsum > 0) %>% 
   select(genus) %>%
   arrange(genus) %>%
   distinct()
 
-# what families; n = 115 (note: was 110 with swarm d = 7)
+# what families; n = 117 (note: added 2 families by examining MOTUs with match <80%))
 zs3 %>% filter(!is.na(family),
                sampsum > 0) %>% 
   select(family) %>%
   arrange(family) %>%
   distinct()
 
-# what orders; n = 16 (note: same result with swarm d = 7)
+# what orders; n = 16 (note: same as before)
 zs3 %>% filter(!is.na(order)) %>% 
   select(order) %>%
   arrange(order) %>%
@@ -835,28 +844,30 @@ zs3 %>% filter(!is.na(order)) %>%
 
 ### Coleop ###
 
-# what species; n = 110 (was 94 with swarm d = 5)
+# note: no change to species, genera, families, or orders by examining MOTUs with match < 80%
+
+# what species; n = 110
 cs3 %>% filter(!is.na(species),
                sampsum > 0) %>% 
   select(species) %>%
   arrange(species) %>%
   distinct()
 
-# what genus; n = 177 (was 154)
+# what genus; n = 177
 cs3 %>% filter(!is.na(genus),
                sampsum > 0) %>% 
   select(genus) %>%
   arrange(genus) %>%
   distinct()
 
-# what families; n = 127 (was 123)
+# what families; n = 127
 cs3 %>% filter(!is.na(family),
                sampsum > 0) %>% 
   select(family) %>%
   arrange(family) %>%
   distinct()
 
-# what orders; n = 23 (was 23)
+# what orders; n = 23
 cs3 %>% filter(!is.na(order),
                sampsum > 0) %>% 
   select(order) %>%
@@ -873,7 +884,7 @@ cs3 %>% filter(!is.na(order),
 
 # Zeale step 1: how many reads after filtering steps performed on cluster
 
-step1 <- z0 %>%
+step1 <- z %>%
   left_join(zc, by = join_by(id, definition, sequence))
 
 # check which columns are negatives
@@ -901,7 +912,7 @@ sum(apply(select(step1.n, starts_with("sample")), 2, sum)) # 1248
 mean(apply(select(step1.n, starts_with("sample")), 2, sum)) # 208
 sd(apply(select(step1.n, starts_with("sample")), 2, sum)) # 418.8
 length(apply(select(step1.n, starts_with("sample")), 2, sum)) # 6
-418.8 / sqrt(6) # 6451
+418.8 / sqrt(6) # 171.0
 
 # Zeale step 2: remove human and mouse 
 
@@ -910,17 +921,16 @@ step2.s <- step1.s %>%
   select(id, match, finalID:species, starts_with("sample")) %>%
   filter(species %notin% c("Homo sapiens", "Mus musculus")) # no mice or humans in COI primer
 
-
-# Zeale step 3: subtract negatives, remove rest of non-arthropods, and match < 0.8
+# Zeale step 3: subtract negatives, remove rest of non-arthropods
   # this is same as zs3 from above
 step3.s <- zs3
 
 # tally up read stats for samples
-sum(apply(select(step3.s, starts_with("sample")), 2, sum)) # 4116475
-mean(apply(select(step3.s, starts_with("sample")), 2, sum)) # 114346.5
-sd(apply(select(step3.s, starts_with("sample")), 2, sum)) # 38731.1
+sum(apply(select(step3.s, starts_with("sample")), 2, sum)) # 4117138
+mean(apply(select(step3.s, starts_with("sample")), 2, sum)) # 114364.9
+sd(apply(select(step3.s, starts_with("sample")), 2, sum)) # 38707.6
 length(apply(select(step3.s, starts_with("sample")), 2, sum)) # 36
-38731.1 / sqrt(36) # 6455.183
+38707.6 / sqrt(36) # 6451.267
 
 step3.n <- zn3
 
@@ -936,7 +946,7 @@ length(apply(select(step3.n, starts_with("sample")), 2, sum)) # 36
 
 # Coleop step 1: how many reads after filtering steps performed on cluster
 
-step1 <- c0 %>%
+step1 <- c %>%
   left_join(select(c2, id, definition, sequence, starts_with("sample")), by = join_by(id, definition, sequence))
 
 # check which columns are negatives
@@ -983,7 +993,7 @@ length(apply(select(step2.s, starts_with("sample")), 2, sum)) # 37
 step2.n <- step1.n %>%
   left_join(select(cs, id:species)) %>%
   select(id, finalID:species, starts_with("sample")) %>%
-  filter(species %notin% c("Homo sapiens", "Mus musculus")) # no mice or humans in COI primer
+  filter(species %notin% c("Homo sapiens", "Mus musculus")) 
 
 # tally up read stats for samples
 sum(apply(select(step2.n, starts_with("sample")), 2, sum)) # 6413
@@ -993,24 +1003,24 @@ length(apply(select(step2.n, starts_with("sample")), 2, sum)) # 17
 986.0064 / sqrt(17) # 239.1417
 # note: 44146 human reads; 9513 mouse reads
 
-# Coleop step 3: subtract negatives, remove rest of non-arthropods, and match < 0.8
+# Coleop step 3: subtract negatives, remove rest of non-arthropods
   # this is same as zs3 from above
 step3.s <- cs3
 
 # tally up read stats for samples
-sum(apply(select(step3.s, starts_with("sample")), 2, sum)) # 2068121
-mean(apply(select(step3.s, starts_with("sample")), 2, sum)) # 55895.16
-sd(apply(select(step3.s, starts_with("sample")), 2, sum)) # 32712.56
+sum(apply(select(step3.s, starts_with("sample")), 2, sum)) # 2240250
+mean(apply(select(step3.s, starts_with("sample")), 2, sum)) # 60547.3
+sd(apply(select(step3.s, starts_with("sample")), 2, sum)) # 32799.31
 length(apply(select(step3.s, starts_with("sample")), 2, sum)) # 37
-32712.56 / sqrt(37) # 5377.912
+32799.31 / sqrt(37) # 5392.173
 
 step3.n <- cn3
 
 # tally up read stats for samples
-sum(apply(select(step3.n, starts_with("sample")), 2, sum)) # 3402
-mean(apply(select(step3.n, starts_with("sample")), 2, sum)) # 200
-sd(apply(select(step3.n, starts_with("sample")), 2, sum)) # 658.4878
+sum(apply(select(step3.n, starts_with("sample")), 2, sum)) # 4442
+mean(apply(select(step3.n, starts_with("sample")), 2, sum)) # 261.2941
+sd(apply(select(step3.n, starts_with("sample")), 2, sum)) # 802.3041
 length(apply(select(step3.n, starts_with("sample")), 2, sum)) # 17
-658.4878/sqrt(17) # 159.7068
+802.3041/sqrt(17) # 194.5873
 ```
 
