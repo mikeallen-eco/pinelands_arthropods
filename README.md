@@ -4,7 +4,7 @@ The purpose of this repository is to provide code and data to reproduce the anal
 The published version will be:
 Allen, M. C., Lockwood, J. L., Kwait, R., Vastano, A., Peterson, D. L. Tkacenko, L. A., … Jaffe, B. D. (2023). Using surface environmental DNA to assess arthropod biodiversity within a forested ecosystem. Environmental DNA.
 
-The archived version of this code is at OSF: [https://doi.org/0.17605/OSF.IO/92VDR](https://doi.org/10.17605/OSF.IO/92VDR)
+The archived version of this code is at OSF: [https://doi.org/10.17605/OSF.IO/92VDR](https://doi.org/10.17605/OSF.IO/92VDR)
 
 # List of files
 
