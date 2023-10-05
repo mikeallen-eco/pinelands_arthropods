@@ -1,0 +1,265 @@
+# Here we make a fasta file from the MOTU table created in pinebugs_post_process_final.Rmd 
+# these fasta files were then used to perform BLAST searches on the Rutgers Amarel cluster
+# The output from that is a series of text files that are combined in the next step
+# and then summarized into species lists by match threshold (90%, 95%, 98%, 99%, 100%)
+# considering only hits with 95% query coverage
+
+```{r}
+# Zeale
+
+# data.frame of the sequences to be blasted
+input_db <- zblast
+# Define names for the output files
+output_db <- "data/merged.uni.c10.l30.L185.sht.srt.nochi.1line.swarm1.fix.tag.ann.srt.bla.Z.fasta"
+
+# Delete previous files
+db_file <- file(output_db,open = "wt")
+
+closeAllConnections()
+
+# Loop to write reference fasta file that will work with ecotag
+showlines <- 10
+
+for (i in 1:nrow(input_db)) {
+  
+  # write it in db_file
+  output_file <- file(output_db, open = "at")
+  writeLines(text = paste0(">",as.character(input_db$id[i])),
+             con = output_file)
+  writeLines(text = gsub("-","",as.character(input_db$sequence[i])), con = output_file)
+  close(output_file)
+  
+  if (i %% showlines == 0) message(i,"/",nrow(input_db)," sequences processed.","\r",appendLF = FALSE)
+}
+
+# Coleop
+
+# data.frame of the sequences to be blasted
+input_db <- cblast
+# Define names for the output files
+output_db <- "data/merged.uni.c10.l75.L125.sht.srt.nochi.1line.swarm1.fix.tag.ann.srt.bla.C.fasta"
+
+# Delete previous files
+db_file <- file(output_db,open = "wt")
+
+closeAllConnections()
+
+# Loop to write reference fasta file that will work with ecotag
+showlines <- 10
+
+for (i in 1:nrow(input_db)) {
+  
+  # write it in db_file
+  output_file <- file(output_db, open = "at")
+  writeLines(text = paste0(">",as.character(input_db$id[i])),
+             con = output_file)
+  writeLines(text = gsub("-","",as.character(input_db$sequence[i])), con = output_file)
+  close(output_file)
+  
+  if (i %% showlines == 0) message(i,"/",nrow(input_db)," sequences processed.","\r",appendLF = FALSE)
+}
+```
+
+# stitch together the output of the blast searches (if applicable)
+BLAST the fasta files created in the last step with blastn (BLAST+) in command line on the cluster. 
+Then process all the text files created using that process here.
+Headers of the table output: https://www.metagenomics.wiki/tools/blast/blastn-output-format-6
+```{r}
+### Zeale ###
+
+# make a list of the file names for each sequence
+bzf <- list.files("data/blast.Zswarm1")[!grepl(x = list.files("data/blast.Zswarm1"), pattern = ">")]
+
+# make a blank dataframe to collect the info on each blast
+blast.Z.output <- data.frame(sequence = rep("", length(bzf)),
+                             bestblst = rep(0, length(bzf)),
+                             blast100 = rep("", length(bzf)),
+                             blast99 = rep("", length(bzf)),
+                             blast98 = rep("", length(bzf)),
+                             blast95 = rep("", length(bzf)),
+                             blast90 = rep("", length(bzf)),
+                             blast80 = rep("", length(bzf)))
+
+# loop through the blast tables from each sequence and extract info
+for(i in 1:length(bzf)){
+  
+  # insert sequence
+  blast.Z.output[i,1] <- 
+    gsub(gsub(bzf[i], pattern = "results_", replacement = ""), pattern = ".txt", replacement = "")  
+  
+  # only proceed if the file isn't empty
+  if (nrow(fread(paste0("data/blast.Zswarm1/", bzf[i]))) > 0) { 
+    bzt <- fread(paste0("data/blast.Zswarm1/", bzf[i])) %>%
+      select(sseqid = 2, match = 3, length = 4, evalue = 11, qlen = 13,
+             taxid = 15, sci = 16) %>%
+      mutate(qcov = length/qlen) %>%
+      filter(qcov >= 0.95)
+    
+    # populate the data fields
+    blast.Z.output[i,2] <- if(nrow(bzt)>0){max(bzt$match)} else{NA}
+    
+    bl100 <- bzt %>% 
+      filter(match >= 100) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl99 <- bzt %>% 
+      filter(match >= 99) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl98 <- bzt %>% 
+      filter(match >= 98) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl95 <- bzt %>% 
+      filter(match >= 95) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl90 <- bzt %>% 
+      filter(match >= 90) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl80 <- bzt %>% 
+      filter(match >= 80) %>%
+      select(sci) %>%
+      distinct()
+    
+    blast.Z.output[i,3] <- paste(bl100$sci, collapse = "; ")
+    blast.Z.output[i,4] <- paste(bl99$sci, collapse = "; ")
+    blast.Z.output[i,5] <- paste(bl98$sci, collapse = "; ")
+    blast.Z.output[i,6] <- paste(bl95$sci, collapse = "; ")
+    blast.Z.output[i,7] <- paste(bl90$sci, collapse = "; ")
+    blast.Z.output[i,8] <- paste(bl80$sci, collapse = "; ")
+  } # END IF (data table is empty)
+} # END LOOP 
+
+### Coleop ###
+
+# make a list of the file names for each sequence
+bcf <- list.files("data/blast.Cswarm1")[!grepl(x = list.files("data/blast.Cswarm1"), pattern = ">")]
+
+# make a blank dataframe to collect the info on each blast
+blast.C.output <- data.frame(sequence = rep("", length(bcf)),
+                             bestblst = rep(0, length(bcf)),
+                             blast100 = rep("", length(bcf)),
+                             blast99 = rep("", length(bcf)),
+                             blast98 = rep("", length(bcf)),
+                             blast95 = rep("", length(bcf)),
+                             blast90 = rep("", length(bcf)),
+                             blast80 = rep("", length(bcf)))
+
+# loop through the blast tables from each sequence and extract info
+for(i in 1:length(bcf)){
+  
+  # insert sequence
+  blast.C.output[i,1] <- 
+    gsub(gsub(bcf[i], pattern = "results_", replacement = ""), pattern = ".txt", replacement = "")  
+  
+  # only proceed if the file isn't empty
+  if (nrow(fread(paste0("data/blast.Cswarm1/", bcf[i]))) > 0) { 
+    bct <- fread(paste0("data/blast.Cswarm1/", bcf[i])) %>%
+      select(sseqid = 2, match = 3, length = 4, evalue = 11, qlen = 13,
+             taxid = 15, sci = 16) %>%
+      mutate(qcov = length/qlen) %>%
+      filter(qcov >= 0.95)
+    
+    # populate the data fields
+    blast.C.output[i,2] <- if(nrow(bct)>0){max(bct$match)} else{NA}
+    
+    bl100 <- bct %>% 
+      filter(match >= 100) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl99 <- bct %>% 
+      filter(match >= 99) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl98 <- bct %>% 
+      filter(match >= 98) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl95 <- bct %>% 
+      filter(match >= 95) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl90 <- bct %>% 
+      filter(match >= 90) %>%
+      select(sci) %>%
+      distinct()
+    
+    bl80 <- bct %>% 
+      filter(match >= 80) %>%
+      select(sci) %>%
+      distinct()
+    
+    blast.C.output[i,3] <- paste(bl100$sci, collapse = "; ")
+    blast.C.output[i,4] <- paste(bl99$sci, collapse = "; ")
+    blast.C.output[i,5] <- paste(bl98$sci, collapse = "; ")
+    blast.C.output[i,6] <- paste(bl95$sci, collapse = "; ")
+    blast.C.output[i,7] <- paste(bl90$sci, collapse = "; ")
+    blast.C.output[i,8] <- paste(bl80$sci, collapse = "; ")
+  } # END IF (data table is empty)
+} # END LOOP 
+
+```
+# combine ecotag and blast info into a csv for manual final species determination
+If not using blast, then skip to "separate the samples and negatives".
+Note: the zz and cc in the code below was created in pinebugs_post_process_final.Rmd.
+```{r}
+
+### Zeale ###
+
+# Write csv file for manually overriding ecotag identifications with BLAST where appropriate
+zzblastID <- zz %>%
+  left_join(blast.Z.output, by = join_by(sequence)) %>%
+  select(id, reads = total_reads, wt = cluster_weight, match, bestblst, 
+         ecotagID = scientific_name, blast100:blast80, splist = starts_with("species_list"), 
+         order_name, family_name, genus_name, species_name, sequence) %>%
+  mutate(bestblst = bestblst / 100,
+         final_sci = "",
+         blastnotes = "",
+         gbif = "") %>%
+  arrange(desc(bestblst)) %>%
+  arrange(desc(match)) %>%
+  select(id, reads, wt, ecotagmatch = match, bestblastmatch = bestblst, ecotagID, blast100:blast80, 
+         splist, ecotag_order = order_name, ecotag_family = family_name, 
+         ecotag_genus = genus_name, overrideID = final_sci, blastnotes, gbif, sequence) 
+# write.csv(zzblastID, "data/zzblastID_swarm1b.csv", row.names = F)
+
+# Now you can curate the final species list MOTU by MOTU 
+# (choosing between blast and ecotag hits at XX level of match etc.)
+# I recommend renaming the file something like blastID_finaltax.csv
+# That way you don't accidentally overwrite it if you ran the code again.
+
+### Coleop ###
+
+# Write csv file for manually overriding ecotag identifications with BLAST where appropriate
+ccblastID <- cc %>%
+  left_join(blast.C.output, by = join_by(sequence)) %>%
+  select(id, reads = total_reads, wt = cluster_weight, match, bestblst, 
+         ecotagID = scientific_name, blast100:blast80, splist = starts_with("species_list"),
+         order_name, family_name, genus_name, species_name, sequence) %>%
+  mutate(bestblst = bestblst / 100,
+         overrideID = "",
+         blastnotes = "",
+         gbif = "") %>%
+  arrange(desc(bestblst)) %>%
+  arrange(desc(match)) %>%
+  select(id, reads, wt, ecotagmatch = match, bestblastmatch = bestblst, ecotagID, blast100:blast80, splist, 
+         ecotag_order = order_name, ecotag_family = family_name, ecotag_genus = genus_name,
+         overrideID, blastnotes, gbif, sequence)
+# write.csv(ccblastID, "data/ccblastID_swarm1b.csv", row.names = F)
+
+# Now you can curate the final species list MOTU by MOTU 
+# (choosing between blast and ecotag hits at XX level of match etc.)
+# I recommend renaming the file something like blastID_finaltax.csv
+# That way you don't accidentally overwrite it if you ran the code again.
+

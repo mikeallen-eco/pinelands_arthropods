@@ -1,0 +1,205 @@
+"family","order","class","final_min","final_max","final_mid","final_source","Body_Size","Body_Size_order"
+"Clubionidae","Araneae","Arachnida","3",10,6.5,"Milne & Milne","5-10 mm",4
+"Linyphiidae","Araneae","Arachnida","2",8,5,"Milne & Milne","<5 mm",5
+"Pisauridae","Araneae","Arachnida","7",26,16.5,"Milne & Milne","10-20 mm",3
+"Salticidae","Araneae","Arachnida","3",15,9,"Milne & Milne","5-10 mm",4
+"Tetragnathidae","Araneae","Arachnida","3",9,6,"Milne & Milne","5-10 mm",4
+"Theridiidae","Araneae","Arachnida","1.5",14,7.75,"Milne & Milne","5-10 mm",4
+"Brachychthoniidae","Sarcoptiformes","Arachnida","0.2",1.5,0.85,"https://www.sciencedirect.com/topics/immunology-and-microbiology/oribatida","<5 mm",5
+"Cymbaeremaeidae","Sarcoptiformes","Arachnida","0.2",1.5,0.85,"https://www.sciencedirect.com/topics/immunology-and-microbiology/oribatida","<5 mm",5
+"Nanorchestidae","Sarcoptiformes","Arachnida","0.2",0.3,0.25,"https://link.springer.com/chapter/10.1007/978-90-481-9837-5_25?noAccess=true","<5 mm",5
+"Oribatulidae","Sarcoptiformes","Arachnida","0.2",1.5,0.85,"https://www.sciencedirect.com/topics/immunology-and-microbiology/oribatida","<5 mm",5
+"Parakalummidae","Sarcoptiformes","Arachnida","0.2",1.5,0.85,"https://www.sciencedirect.com/topics/immunology-and-microbiology/oribatida","<5 mm",5
+"Tectocepheidae","Sarcoptiformes","Arachnida","0.2",1.5,0.85,"https://www.sciencedirect.com/topics/immunology-and-microbiology/oribatida","<5 mm",5
+"Cunaxidae","Trombidiformes","Arachnida","0.4",0.75,0.575,"bugguide (data)","<5 mm",5
+"Erythraeidae","Trombidiformes","Arachnida","2.4",2.8,2.6,"bugguide (data)","<5 mm",5
+"Eupodidae","Trombidiformes","Arachnida","0.3",1,0.65,"bugguide (data)","<5 mm",5
+"Tarsonemidae","Trombidiformes","Arachnida","0.2",0.3,0.25,"bugguide (data) / UGA extension","<5 mm",5
+"Phytoptidae","Trombidiformes","Arachnida","0.2",0.25,0.225,"https://link.springer.com/article/10.1007/s10493-015-9981-5","<5 mm",5
+"Henicopidae","Lithobiomorpha","Chilopoda","6",30,18,"bugguide (data)","10-20 mm",3
+"Entomobryidae","Entomobryomorpha","Collembola","0.25",6,3,"Borror","<5 mm",5
+"Blattidae","Blattodea","Insecta","25",39,27,"Borror",">20 mm",2
+"Ectobiidae","Blattodea","Insecta","3",12,7.5,"Borror","5-10 mm",4
+"Rhinotermitidae","Blattodea","Insecta","6",8,7,"Borror","5-10 mm",4
+"Anobiidae","Coleoptera","Insecta","1",9,5,"Borror","<5 mm",5
+"Apionidae","Coleoptera","Insecta","1",4.5,2.75,"Borror & White","<5 mm",5
+"Buprestidae","Coleoptera","Insecta","3",20,11.5,"Borror","10-20 mm",3
+"Cantharidae","Coleoptera","Insecta","1",15,8,"Borror","5-10 mm",4
+"Carabidae","Coleoptera","Insecta","5",25,15,"Borror","10-20 mm",3
+"Cerambycidae","Coleoptera","Insecta","3",60,31.5,"Borror",">20 mm",2
+"Chrysomelidae","Coleoptera","Insecta","3.5",12,7.75,"Borror","5-10 mm",4
+"Cleridae","Coleoptera","Insecta","5",12,8.5,"Borror","5-10 mm",4
+"Coccinellidae","Coleoptera","Insecta","0.8",10,5.4,"Borror","5-10 mm",4
+"Corylophidae","Coleoptera","Insecta","0.56000000000000005",1,0.78,"Borror/bugguide (range)","<5 mm",5
+"Curculionidae","Coleoptera","Insecta","1.5",15,8.25,"Borror","5-10 mm",4
+"Dytiscidae","Coleoptera","Insecta","1.2",40,20.1,"Borror",">20 mm",2
+"Elateridae","Coleoptera","Insecta","12",30,21,"Borror",">20 mm",2
+"Endomychidae","Coleoptera","Insecta","3",8,5.5,"Borror","5-10 mm",4
+"Erotylidae","Coleoptera","Insecta","8",20,14,"Borror","10-20 mm",3
+"Hydrophilidae","Coleoptera","Insecta","3",40,21.5,"Borror",">20 mm",2
+"Laemophloeidae","Coleoptera","Insecta","1.3",3,2.15,"bugguide (range)","<5 mm",5
+"Latridiidae","Coleoptera","Insecta","1",3,1.5,"Borror","<5 mm",5
+"Melandryidae","Coleoptera","Insecta","3",20,11.5,"Borror","10-20 mm",3
+"Meloidae","Coleoptera","Insecta","7",25,16,"Borror","10-20 mm",3
+"Melyridae","Coleoptera","Insecta","2",10,6,"Borror/bugguide (range)","5-10 mm",4
+"Monotomidae","Coleoptera","Insecta","1.5",3,2.25,"Borror","<5 mm",5
+"Mycetophagidae","Coleoptera","Insecta","1.5",5.5,3.5,"Borror","<5 mm",5
+"Nitidulidae","Coleoptera","Insecta","0.9",12,6.45,"Borror/bugguide (range)","5-10 mm",4
+"Phalacridae","Coleoptera","Insecta","1",3,2,"Borror","<5 mm",5
+"Ptiliidae","Coleoptera","Insecta","0.35",1,0.675,"Borror/bugguide (range)","<5 mm",5
+"Scarabaeidae","Coleoptera","Insecta","5",50,27.5,"Borror",">20 mm",2
+"Scraptiidae","Coleoptera","Insecta","1",13.5,7.25,"bugguide (range)","5-10 mm",4
+"Silphidae","Coleoptera","Insecta","10",35,22.5,"Borror",">20 mm",2
+"Silvanidae","Coleoptera","Insecta","1.2",15,8.1,"bugguide (range)","5-10 mm",4
+"Staphylinidae","Coleoptera","Insecta","0.5",25,12.75,"Borror","10-20 mm",3
+"Tenebrionidae","Coleoptera","Insecta","5",17,11,"Borror","10-20 mm",3
+"Acroceridae","Diptera","Insecta","3",6,6,"bugguide (data)","5-10 mm",4
+"Agromyzidae","Diptera","Insecta","1",5,3,"bugguide (range)","<5 mm",5
+"Anisopodidae","Diptera","Insecta","4",8,6,"bugguide (range)","5-10 mm",4
+"Asilidae","Diptera","Insecta","9",15,12,"bugguide (range)","10-20 mm",3
+"Bibionidae","Diptera","Insecta","5",12,8.5,"bugguide (range)","5-10 mm",4
+"Calliphoridae","Diptera","Insecta","5",15,10,"Milne & Milne","5-10 mm",4
+"Cecidomyiidae","Diptera","Insecta","1",5,3,"Borror","<5 mm",5
+"Ceratopogonidae","Diptera","Insecta","1",3,2,"bugguide (range)","<5 mm",5
+"Chaoboridae","Diptera","Insecta","1.5",10,5.75,"bugguide (range)","5-10 mm",4
+"Chironomidae","Diptera","Insecta","1",10,5.5,"Borror","5-10 mm",4
+"Chloropidae","Diptera","Insecta","1.6",3.2,2.4,"Insects of Texas","<5 mm",5
+"Culicidae","Diptera","Insecta","3",15,9,"bugguide (range)","5-10 mm",4
+"Dolichopodidae","Diptera","Insecta","1",5,3,"bugguide (range)","<5 mm",5
+"Drosophilidae","Diptera","Insecta","3",4,3.5,"Borror","<5 mm",5
+"Ephydridae","Diptera","Insecta","2.5",9,5.75,"bugguide (range)","5-10 mm",4
+"Fanniidae","Diptera","Insecta","3",7,5,"bugguide (data)","<5 mm",5
+"Limoniidae","Diptera","Insecta","10",25,17.5,"Borror & White","10-20 mm",3
+"Muscidae","Diptera","Insecta","3",12,7.5,"Milne & Milne","5-10 mm",4
+"Mycetophilidae","Diptera","Insecta","2.2000000000000002",13.5,7.85,"bugguide (range)","5-10 mm",4
+"Pediciidae","Diptera","Insecta","5",35,20,"bugguide (data)","10-20 mm",3
+"Phoridae","Diptera","Insecta","1",7,4,"bugguide (range)","<5 mm",5
+"Platypezidae","Diptera","Insecta","2",5,3.5,"bugguide (range)","<5 mm",5
+"Platystomatidae","Diptera","Insecta","3",12,7.5,"bugguide (range)","5-10 mm",4
+"Polleniidae","Diptera","Insecta","5",15,10,"Milne & Milne","5-10 mm",4
+"Psychodidae","Diptera","Insecta","1.5",4,2.75,"bugguide (range)","<5 mm",5
+"Rhiniidae","Diptera","Insecta","5",15,10,"Milne & Milne","5-10 mm",4
+"Sarcophagidae","Diptera","Insecta","2",14,8,"Milne & Milne","5-10 mm",4
+"Scatopsidae","Diptera","Insecta","0.6",3,1.8,"Borror / bugguide (range)","<5 mm",5
+"Sciaridae","Diptera","Insecta","1",5,3,"bugguide (range)","<5 mm",5
+"Simuliidae","Diptera","Insecta","1",4,2.5,"Borror & White / bugguide (range)","<5 mm",5
+"Sphaeroceridae","Diptera","Insecta","1",5.5,3.25,"bugguide (range)","<5 mm",5
+"Stratiomyidae","Diptera","Insecta","9",12,10.5,"Milne & Milne","10-20 mm",3
+"Syrphidae","Diptera","Insecta","5",18,11.5,"Milne & Milne","10-20 mm",3
+"Tabanidae","Diptera","Insecta","10",25,17.5,"Borror & White","10-20 mm",3
+"Tachinidae","Diptera","Insecta","3",14,8.5,"Milne & Milne","5-10 mm",4
+"Tephritidae","Diptera","Insecta","4",9,6.5,"Milne & Milne","5-10 mm",4
+"Tipulidae","Diptera","Insecta","10",25,17.5,"Borror & White","10-20 mm",3
+"Trichoceridae","Diptera","Insecta","4",11,10,"bugguide (data)","5-10 mm",4
+"Ulidiidae","Diptera","Insecta","4",7,5.5,"bugguide (data)","5-10 mm",4
+"Baetidae","Ephemeroptera","Insecta","3",11,7,"Milne & Milne","5-10 mm",4
+"Caenidae","Ephemeroptera","Insecta","2",6,4,"Borror","<5 mm",5
+"Ephemerellidae","Ephemeroptera","Insecta","5",19,12,"Milne & Milne","10-20 mm",3
+"Adelgidae","Hemiptera","Insecta","0.6",3,1.8,"bugguide (data)","<5 mm",5
+"Aphalaridae","Hemiptera","Insecta","1",3.5,2.25,"bugguide (data)","<5 mm",5
+"Aphididae","Hemiptera","Insecta","0.5",6,3.25,"Borror","<5 mm",5
+"Cicadellidae","Hemiptera","Insecta","2",13,7.5,"Borror / Milne & Milne","5-10 mm",4
+"Cicadidae","Hemiptera","Insecta","25",60,37.5,"Borror",">20 mm",2
+"Coreidae","Hemiptera","Insecta","9",23,16,"Milne & Milne","10-20 mm",3
+"Fulgoridae","Hemiptera","Insecta","8",10,9,"Milne & Milne","5-10 mm",4
+"Lygaeidae","Hemiptera","Insecta","8",18,13,"Milne & Milne","10-20 mm",3
+"Miridae","Hemiptera","Insecta","4",10,7,"Borror","5-10 mm",4
+"Pemphigidae","Hemiptera","Insecta","1.5",6,3.75,"bugguide (data)","<5 mm",5
+"Pentatomidae","Hemiptera","Insecta","6",20,13,"Milne & Milne","10-20 mm",3
+"Phymatidae","Hemiptera","Insecta","8",12,10,"Milne & Milne","5-10 mm",4
+"Reduviidae","Hemiptera","Insecta","12",36,24,"Milne & Milne",">20 mm",2
+"Saldidae","Hemiptera","Insecta","4",5,4.5,"bugguide (range)","<5 mm",5
+"Aphelinidae","Hymenoptera","Insecta","1",1,1,"Borror","<5 mm",5
+"Braconidae","Hymenoptera","Insecta","2",15,15.5,"Milne & Milne","10-20 mm",3
+"Chrysididae","Hymenoptera","Insecta","6",12,9,"Borror & White","5-10 mm",4
+"Diprionidae","Hymenoptera","Insecta","6",12,9,"bugguide (range)","5-10 mm",4
+"Formicidae","Hymenoptera","Insecta","1",25,13,"Milne & Milne","10-20 mm",3
+"Ichneumonidae","Hymenoptera","Insecta","3",40,21.5,"Borror & White",">20 mm",2
+"Mymaridae","Hymenoptera","Insecta","0.21",1,0.605,"Borror & White","<5 mm",5
+"Pergidae","Hymenoptera","Insecta","3",10,6.5,"Sawfly GenUS","5-10 mm",4
+"Platygastridae","Hymenoptera","Insecta","2",5,3.5,"Chen et al. (Zookeys)","<5 mm",5
+"Scelionidae","Hymenoptera","Insecta","1",2,1.5,"Borror & White","<5 mm",5
+"Tenthredinidae","Hymenoptera","Insecta","5",20,12.5,"Borror & White","10-20 mm",3
+"Vespidae","Hymenoptera","Insecta","10",30,20,"Milne & Milne","10-20 mm",3
+"Blastobasidae","Lepidoptera","Insecta","4",15,9.5,"Powel & Opler (MWN)","5-10 mm",4
+"Bombycidae","Lepidoptera","Insecta","17.5",20,18.75,"Borror & White","10-20 mm",3
+"Bucculatricidae","Lepidoptera","Insecta","2.5",7,4.75,"Powel & Opler (MWN)","<5 mm",5
+"Cosmopterigidae","Lepidoptera","Insecta","2",13,7.5,"bugguide (range)","5-10 mm",4
+"Crambidae","Lepidoptera","Insecta","5",17.5,11.25,"bugguide (range)","10-20 mm",3
+"Elachistidae","Lepidoptera","Insecta","5",15,10,"Hodges 1999","5-10 mm",4
+"Erebidae","Lepidoptera","Insecta","3",75,39,"Milne & Milne / Wikipedia",">20 mm",2
+"Plutellidae","Lepidoptera","Insecta","4",8,6,"Dugdale et al. 1999","5-10 mm",4
+"Gelechiidae","Lepidoptera","Insecta","5",8,6.5,"Hodges 1999 / Milne & Milne","5-10 mm",4
+"Geometridae","Lepidoptera","Insecta","4",32.5,18.25,"Milne & Milne","10-20 mm",3
+"Gracillariidae","Lepidoptera","Insecta","2",10,6,"Davis & Robinson 1999","5-10 mm",4
+"Hesperiidae","Lepidoptera","Insecta","7",25,16,"Milne & Milne","10-20 mm",3
+"Limacodidae","Lepidoptera","Insecta","4",35,19.5,"Powel & Opler (MWN)","10-20 mm",3
+"Lycaenidae","Lepidoptera","Insecta","9.5",25.5,17.5,"Insects of Texas","10-20 mm",3
+"Meessiidae","Lepidoptera","Insecta","2.5",6,4.25,"bugguide (range)","<5 mm",5
+"Nepticulidae","Lepidoptera","Insecta","1.5",4.5,3,"bugguide (range)","<5 mm",5
+"Noctuidae","Lepidoptera","Insecta","20",50,35,"Milne & Milne",">20 mm",2
+"Notodontidae","Lepidoptera","Insecta","11",43,27,"Powel & Opler (MWN)",">20 mm",2
+"Nymphalidae","Lepidoptera","Insecta","15",38,26.5,"Insects of Texas",">20 mm",2
+"Oecophoridae","Lepidoptera","Insecta","4",23,13.5,"Powel & Opler (MWN)","10-20 mm",3
+"Papilionidae","Lepidoptera","Insecta","25.5",63.5,44.5,"Insects of Texas",">20 mm",2
+"Pyralidae","Lepidoptera","Insecta","5",30,17.5,"Powel & Opler (MWN)","10-20 mm",3
+"Saturniidae","Lepidoptera","Insecta","12.5",76,44.25,"Insects of Texas",">20 mm",2
+"Sphingidae","Lepidoptera","Insecta","25.5",63.5,44.5,"Insects of Texas",">20 mm",2
+"Stathmopodidae","Lepidoptera","Insecta","3.5",7.5,5.5,"Microlep. of Europe","5-10 mm",4
+"Tineidae","Lepidoptera","Insecta","2.5",25,13.75,"Powel & Opler (MWN)","10-20 mm",3
+"Tortricidae","Lepidoptera","Insecta","8",35,21.5,"Milne & Milne",">20 mm",2
+"Eremiaphilidae","Mantodea","Insecta","15",150,82.5,"Other",">20 mm",2
+"Mantidae","Mantodea","Insecta","15",150,82.5,"Milne & Milne",">20 mm",2
+"Chrysopidae","Neuroptera","Insecta","3",35,19,"Insect Biodiversity : Science and Society, Volume 2","10-20 mm",3
+"Coniopterygidae","Neuroptera","Insecta","2",6,4,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Hemerobiidae","Neuroptera","Insecta","3",18,10.5,"Insect Biodiversity : Science and Society, Volume 2","10-20 mm",3
+"Mantispidae","Neuroptera","Insecta","5",35,20,"Insect Biodiversity : Science and Society, Volume 2","10-20 mm",3
+"Nymphidae","Neuroptera","Insecta","18",40,29,"Insect Biodiversity : Science and Society, Volume 2",">20 mm",2
+"Coenagrionidae","Odonata","Insecta","20",50,35,"Borror",">20 mm",2
+"Libellulidae","Odonata","Insecta","20",75,47.5,"Borror",">20 mm",2
+"Acrididae","Orthoptera","Insecta","12",80,46,"Milne & Milne",">20 mm",2
+"Gryllidae","Orthoptera","Insecta","9",25,17,"Milne & Milne","10-20 mm",3
+"Rhaphidophoridae","Orthoptera","Insecta","19",50,34.5,"Insects of Texas",">20 mm",2
+"Tettigoniidae","Orthoptera","Insecta","14",75,44.5,"Milne & Milne",">20 mm",2
+"Diapheromeridae","Phasmatodea","Insecta","75",150,112.5,"Milne & Milne",">20 mm",2
+"Amphipsocidae","Psocoptera","Insecta","3",4.5,3.75,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Caeciliusidae","Psocoptera","Insecta","2",4,3,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Ectopsocidae","Psocoptera","Insecta","1.5",2,1.75,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Lachesillidae","Psocoptera","Insecta","2",3,2.5,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Lepidopsocidae","Psocoptera","Insecta","1.1000000000000001",4,2.55,"bugguide (data)","<5 mm",5
+"Myopsocidae","Psocoptera","Insecta","4",5,4.5,"Borror","<5 mm",5
+"Peripsocidae","Psocoptera","Insecta","1.5",3,2.5,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Philotarsidae","Psocoptera","Insecta","2.5",3.5,3,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Pseudocaeciliidae","Psocoptera","Insecta","2.5",3.5,3,"Insect Biodiversity : Science and Society, Volume 2","<5 mm",5
+"Psocidae","Psocoptera","Insecta","2.5",10,6.25,"Insect Biodiversity : Science and Society, Volume 2","5-10 mm",4
+"Ceratophyllidae","Siphonaptera","Insecta","2",2,2,"bugguide (data)","<5 mm",5
+"Thripidae","Thysanoptera","Insecta","0.8",3.2,2,"Insects of Texas","<5 mm",5
+"Hydroptilidae","Trichoptera","Insecta","1.5",6,3.75,"Borror","<5 mm",5
+"Leptoceridae","Trichoptera","Insecta","5",17,11,"Borror","10-20 mm",3
+"Limnephilidae","Trichoptera","Insecta","7",23,15,"Borror","10-20 mm",3
+"Blattellidae","Blattodea","Insecta","3",16,9.5,"Borror / Milne & Milne","5-10 mm",4
+"Rhinophoridae","Diptera","Insecta","3",14,8.5,"Borror / Milne & Milne","5-10 mm",4
+"Ptinidae","Coleoptera","Insecta","1",6,3.5,"White / Milne & Milne","<5 mm",5
+"Cyclopidae","Cyclopoida","Insecta","0.7",0.7,0.7,"bugguide (data)","<5 mm",5
+"Philopteridae","Phthiraptera","Insecta","NA",1.5,1,"Milne & Milne","<5 mm",5
+"Gryllacrididae","Orthoptera","Insecta","13",15,14,"Borror & White","10-20 mm",3
+"Sclerosomatidae","Opiliones","Arachnida","4",20,23,"Milne & Milne",">20 mm",2
+"Nabidae","Hemiptera","Insecta","3.5",11,7.25,"Borror","5-10 mm",4
+"Geocoridae","Hemiptera","Insecta","3",15,9,"Borror & White","5-10 mm",4
+"Oestridae","Diptera","Insecta","12",25,18.5,"bugguide (data)","10-20 mm",3
+"Corydalidae","Megaloptera","Insecta","20",70,45,"Milne & Milne",">20 mm",2
+"Forficulidae","Dermaptera","Insecta","12",20,16,"Borror","10-20 mm",3
+"Hypogastruridae","Poduromorpha","Collembola","1",2,1.5,"Borror","<5 mm",5
+"Cydnidae","Hemiptera","Insecta","3",8,5.5,"Arnett (2000)","5-10 mm",4
+"Argidae","Hymenoptera","Insecta","8",15,11.5,"Arnett (2000)","10-20 mm",3
+"Coelopidae","Diptera","Insecta","4",9,6.5,"Milne & Milne","5-10 mm",4
+"Bdellidae","Trombidiformes","Arachnida","1",1.5,1.25,"bugguide (data)","<5 mm",5
+"Phenopelopidae","Sarcoptiformes","Arachnida","0.2",1.5,0.85,"Article","<5 mm",5
+"Coleophoridae","Lepidoptera","Insecta","3.5",13,8.25,"Powel & Opler (MWN)","5-10 mm",4
+"Anthomyiidae","Diptera","Insecta","3",12,7.5,"Milne & Milne","5-10 mm",4
+"Isotomidae","Entomobryomorpha","Collembola","0.67",3,1.84,"bugguide (data)","<5 mm",5
+"Lonchopteridae","Diptera","Insecta","2",5,3.5,"Klymko (2008)","<5 mm",5
+"Sciomyzidae","Diptera","Insecta","4",8,6,"Milne & Milne","5-10 mm",4
+"Phytoseiidae"," Mesostigmata","Arachnida","0.2",1,0.6,"bugguide (data)","<5 mm",5
+"Depressariidae","Lepidoptera","Insecta","7",17,11.5,"Powel & Opler (MWN)","10-20 mm",3
+"Lauxaniidae","Diptera","Insecta","3.5",6,4.75,"Borror  / bugguide (data)","<5 mm",5

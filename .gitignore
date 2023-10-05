@@ -4,8 +4,13 @@
 .Ruserdata
 /writing
 /figures
-/data
-/output
-/taxo
+/data/old
+/data/notupload
+/output/multinomial
+/output/old
 *.fas
 .DS_Store
+/data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.Z.tsv
+/data/ncbi.bold.art.hum.mus.may23.pcr.pga.tax.uni.cln.C.tsv
+/scripts/old
+/scripts/notupload
