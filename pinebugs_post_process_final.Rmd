@@ -3,7 +3,7 @@
 
 Allen, M. C., Lockwood, J. L., Kwait, R., Vastano, A., Peterson, D. L. Tkacenko, L. A., … Jaffe, B. D. (2023). Using surface environmental DNA to assess arthropod biodiversity within a forested ecosystem. Environmental DNA.
 
-The code takes the raw ecotag output and the raw MOTU table, joins them, and performs all filtering steps to get to the final data set. Note that there is a break in the code where sequences were exported to a fasta file (make_blasta.R), searched using BLAST on the cluster (custom bash script), and then re-combined with the ecotag annotated MOTU table for manual curation. This code also allows you to skip that labor intensive step by reading in the final MOTU table with manually curated taxonomy (see Methods in Allen et al. 2023).
+The code takes the raw ecotag output and the raw MOTU table, joins them, and performs all filtering steps to get to the final data set. Note that there is a break in the code where sequences were exported to a fasta file (process_blast.R), searched using BLAST on the cluster (custom bash script), and then re-combined with the ecotag annotated MOTU table for manual curation. This code also allows you to skip that labor intensive step by reading in the final MOTU table with manually curated taxonomy (see Methods in Allen et al. 2023).
 
 # read in data and load libraries
 ```{r}

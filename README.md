@@ -40,4 +40,4 @@ Files in the data folder referenced in pinebugs_post_process_final.Rmd
 7. full_tax_lookup.csv - A lookup table to add higher taxonomy (families, orders, etc.) to MOTU table. File was created using the /scripts/add_higher_taxa.R script.
 
 /output
-These .rds files store model output that is referenced in the pinebugs_analysis_file.Rmd.
+These .rds files store model output that is referenced in the pinebugs_analysis_final.Rmd.
