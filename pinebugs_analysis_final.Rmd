@@ -3342,9 +3342,9 @@ zs3insect <- zs3 %>%
   filter(class == "Insecta")
 
 unique(c(cs3insect$family, zs3insect$family)) # 159 families
-unique(c(cs3insect$species, zs3insect$species)) # 278 species
+unique(c(cs3insect$species, zs3insect$species)) # 283 species
 
-# time estimates from Anthony and Bobby
+# time estimates for lab work
 # 
 # Extractions (20 hrs)
 # PCR optimization (40-80 hrs)
