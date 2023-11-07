@@ -6,6 +6,8 @@ Allen, M. C., Lockwood, J. L., Kwait, R., Vastano, A., Peterson, D. L. Tkacenko,
 
 The archived version of this code is at OSF: [https://doi.org/10.17605/OSF.IO/92VDR](https://doi.org/10.17605/OSF.IO/92VDR)
 
+The published manuscript is here: [https://doi.org/10.1002/edn3.487](https://doi.org/10.1002/edn3.487)
+
 # List of files
 
 /
